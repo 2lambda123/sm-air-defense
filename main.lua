@@ -238,14 +238,14 @@ function AutolaunchState_new()
 end
 function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
 	local time_since = os.clock() - state.start_time
-	local launch_time = CONFIG.autolaunch.launch_time
+	local aiming_time = CONFIG.autolaunch.aiming_time
 
-	if time_since >= launch_time + 1 then
+	if time_since >= aiming_time + 1 then
 		launch_fn(false)
-	elseif time_since >= launch_time then
+	elseif time_since >= aiming_time then
 		local can_launch = CONFIG.autolaunch.min_launch_vangle <= DEMA_get(state.angles_mean.vangle) + CONFIG.motor.vangle
 		launch_fn(can_launch)
-	elseif time_since >= launch_time - CONFIG.autolaunch.stabilization_time then
+	elseif time_since >= aiming_time - CONFIG.autolaunch.stabilization_time then
 		launch_fn(false)
 		--print("DO NOTING")
 	else
@@ -281,8 +281,8 @@ CONFIG = CONFIG or {
 		acceleration = 0
 	}, autolaunch = {
 		enable = true,
-		--launch_time = 3.5,
-		launch_time = 7,
+		--aiming_time = 3.5,
+		aiming_time = 7,
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20),
 		min_aim_vangle = math.rad(5)
@@ -327,6 +327,6 @@ else
 			vmotor.setAngle(vangle + CONFIG.motor.vangle)
 		end
 		autolaunch_start(autolaunch_state, aim_fn, launch_fn, hangle, vangle)
-		--print(math.floor((os.clock() - autolaunch_start_time - launch_time) * 100) / 100)
+		--print(math.floor((os.clock() - autolaunch_start_time - aiming_time) * 100) / 100)
 	end
 end
