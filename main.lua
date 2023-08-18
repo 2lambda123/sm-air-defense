@@ -53,7 +53,7 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	end
 	return solutions
 end
-function find_target_by(radar, filter_fn)
+function find_target(radar, filter_fn)
 	for angle_mul=0,1 do
 		radar.setAngle(angle_mul * math.pi)
 		for _, v in pairs(radar.getTargets()) do
@@ -214,21 +214,21 @@ function calculate_aim(position, velocity, acceleration)
 	return distance, hangle, vangle
 end
 
-function StrongFindTargetState_new()
+function SmartFindTargetState_new()
 	return { time = -math.huge, find_fn }
 end
 
-function strong_find_target_by(state, radar, fn)
+function smart_find_target(state, radar, fn)
 	if os.clock() - state.time > CONFIG.tracker.expiration_time then
 		state.find_fn = function(v) return fn(v) end
 		state.time = math.huge
 	end
-	local target = find_target_by(radar, state.find_fn)
+	local target = find_target(radar, state.find_fn)
 	if target ~= nil then
 		state.find_fn = function(v) return v[1] == target[1] and fn(v) end
 		state.time = os.clock()
 	else
-		find_target_by(radar, function(v) return  end)
+		find_target(radar, function(v) return  end)
 	end
 	return target
 end
@@ -295,9 +295,9 @@ vmotor = vmotor or get_motor(2)
 
 target_tracker = target_tracker or TargetTracker_new()
 
-target_finder_state = target_finder_state or StrongFindTargetState_new()
+target_finder_state = target_finder_state or SmartFindTargetState_new()
 
-local target = strong_find_target_by(target_finder_state, radar, function(v)
+local target = smart_find_target(target_finder_state, radar, function(v)
 	return v[4] * math.sin(v[3]) >= CONFIG.tracker.min_height
 		   and v[4] >= CONFIG.tracker.min_distance and v[4] <= CONFIG.tracker.max_distance
 end)
