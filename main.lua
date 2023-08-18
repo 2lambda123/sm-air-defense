@@ -235,7 +235,9 @@ function smart_find_target(state, radar, fn)
 		state.find_fn = function(v) return v[1] == state.target[1] and fn(v) end
 		state.time = os.clock()
 	elseif state.target ~= nil then
-		state.find_fn = function(v) return fn(v) and dist_between_targets(v, state.target) <= CONFIG.tracker.merge_max_distance end
+		state.find_fn = function(v)
+			return v[1] == state.target[1] or dist_between_targets(v, state.target) <= CONFIG.tracker.merge_max_distance 
+		end
 	end
 	return target
 end
@@ -287,7 +289,7 @@ CONFIG = CONFIG or {
 		speed = 84,
 		acceleration = 0
 	}, autolaunch = {
-		enable = true,
+		enable = false,
 		--aiming_time = 3.5,
 		aiming_time = 7,
 		stabilization_time = 0.15,
