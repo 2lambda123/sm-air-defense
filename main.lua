@@ -124,7 +124,7 @@ end
 function SMA_new(size, default)
 	return {size = size, result = default or 0, index = 1, default = default or 0}
 end
-function SMA_commit(self, value)
+function SMA_update(self, value)
 	self.result = self.result + (value - (self[self.index] or self.default)) / self.size
 	self[self.index] = value
 	self.index = (self.index % self.size) + 1
@@ -135,7 +135,7 @@ function SMA_get(self) return self.result end
 function CA_new(zero)
 	return {n = 1, result = zero or 0}
 end
-function CA_commit(self, value)
+function CA_update(self, value)
 	self.result = self.result + (value - self.result) / self.n
 	self.n = self.n + 1
 	return self.result
@@ -145,7 +145,7 @@ function CA_get(self) return self.result end
 function EMA_new(smoothing_constant)
 	return { alpha = smoothing_constant, result}
 end
-function EMA_commit(self, value)
+function EMA_update(self, value)
 	self.result = value * self.alpha + (self.result or value) * (1 - self.alpha)
 	return self.result
 end
@@ -155,8 +155,8 @@ function EMA_set(self, value) self.result = value end
 function DEMA_new(a)
 	return { result, alpha = a, result_ema = EMA_new(a) }
 end
-function DEMA_commit(self, value)
-	self.result = EMA_commit(self.result_ema, value) * self.alpha + (self.result or value) * (1 - self.alpha)
+function DEMA_update(self, value)
+	self.result = EMA_update(self.result_ema, value) * self.alpha + (self.result or value) * (1 - self.alpha)
 	return self.result
 end
 function DEMA_get(self) return self.result end
@@ -190,8 +190,8 @@ function TargetTracker_update(self)
 		EMA_set(self.velocity_mean, EMA_get(self.velocity_mean) + EMA_get(self.acceleration_mean)*time)
 	end
 
-	EMA_commit(self.velocity_mean, vel1)
-	EMA_commit(self.acceleration_mean, accel)
+	EMA_update(self.velocity_mean, vel1)
+	EMA_update(self.acceleration_mean, accel)
 end
 function TargetTracker_velocity(self)
 	return EMA_get(self.velocity_mean) or sm.vec3.zero()
@@ -251,8 +251,8 @@ function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
 	else
 		--print("AIMING")
 		launch_fn(false)
-		local hangle = DEMA_commit(state.angles_mean.hangle, new_hangle)
-		local vangle = DEMA_commit(state.angles_mean.vangle, new_vangle)
+		local hangle = DEMA_update(state.angles_mean.hangle, new_hangle)
+		local vangle = DEMA_update(state.angles_mean.vangle, new_vangle)
 		if vangle >= CONFIG.autolaunch.min_aim_vangle then
 			aim_fn(hangle, vangle)
 		end
