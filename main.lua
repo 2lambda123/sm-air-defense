@@ -1,3 +1,4 @@
+sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.acos, math.asin
 function cbrt(x)
 	if x < 0 then return -((-x)^(1/3))
 	else return (x)^(1/3) end
@@ -5,7 +6,7 @@ end
 function solve_quadratic(a, b, c)
 	local D = b^2 - 4*a*c
 	if D > 0 then
-		local sqrt_D = math.sqrt(D)
+		local sqrt_D = sqrt(D)
 		return { (-b + sqrt_D) / (2*a), (-b - sqrt_D) / (2*a) }
 	elseif D == 0 then
 		return { -b/(2*a) }
@@ -19,14 +20,14 @@ function solve_cubic(a, b, c, d)
 	local Q = p^3/27 + q^2/4
 	local solutions
 	if Q > 0 then
-		solutions = { cbrt(-q/2 + math.sqrt(Q)) + cbrt(-q/2 - math.sqrt(Q)) }
+		solutions = { cbrt(-q/2 + sqrt(Q)) + cbrt(-q/2 - sqrt(Q)) }
 	elseif Q == 0 then
 		local u = cbrt(-q/2)
 		solutions = { u*2, -u, -u }
 	else
-		local u = math.acos(3*q/(2*p)*math.sqrt(-3/p)) / 3
-		local v = 2*math.sqrt(-p/3)
-		solutions = { v*math.cos(u), v*math.cos(u - 2*math.pi/3), v*math.cos(u - 4*math.pi/3) }
+		local u = acos(3*q/(2*p)*sqrt(-3/p)) / 3
+		local v = 2*sqrt(-p/3)
+		solutions = { v*cos(u), v*cos(u - 2*pi/3), v*cos(u - 4*pi/3) }
 	end
 	for i=1,#solutions do
 		solutions[i] = solutions[i] - b/(3*a)
@@ -42,7 +43,7 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	local s = solve_cubic(2, -p, -2*r, r*p - q^2/4)[1]
 
 	if 2*s <= p then return {} end
-	local u = math.sqrt(2*s - p)
+	local u = sqrt(2*s - p)
 	local v = q/(2*u)
 	local solutions = solve_quadratic(1, -u, v + s)
 	local solutions2 = solve_quadratic(1, u, -v + s)
@@ -55,7 +56,7 @@ function solve_quartic(c0, c1, c2, c3, c4)
 end
 function find_target(radar, filter_fn)
 	for angle_mul=0,1 do
-		radar.setAngle(angle_mul * math.pi)
+		radar.setAngle(angle_mul * pi)
 		for _, v in pairs(radar.getTargets()) do
 			if filter_fn(v) then
 				return v
@@ -67,8 +68,8 @@ end
 
 function get_radar()
 	local radar = sci and sci.getRadars()[1] or getRadars()[1]
-	radar.setHFov(math.pi)
-	radar.setVFov(math.pi)
+	radar.setHFov(pi)
+	radar.setVFov(pi)
 	return radar
 end
 
@@ -83,16 +84,16 @@ function get_motor(index)
 end
 
 function polar_to_vec3(distance, hangle, vangle)
-	local x = distance * math.cos(vangle) * math.cos(hangle)
-	local y = distance * math.cos(vangle) * math.sin(hangle)
-	local z = distance * math.sin(vangle)
+	local x = distance * cos(vangle) * cos(hangle)
+	local y = distance * cos(vangle) * sin(hangle)
+	local z = distance * sin(vangle)
 	return sm.vec3.new(x, y, z)
 end
 
 function vec3_to_polar(vector)
 	local distance = vector:length()
-	local hangle = math.acos(vector.x / math.sqrt(vector.x^2 + vector.y^2)) * (vector.y < 0 and -1 or 1)
-	local vangle = math.asin(vector.z / distance)
+	local hangle = acos(vector.x / sqrt(vector.x^2 + vector.y^2)) * (vector.y < 0 and -1 or 1)
+	local vangle = asin(vector.z / distance)
 	return distance, hangle, vangle
 end
 
@@ -102,8 +103,7 @@ end
 
 function dist_between_targets(target1, target2)
 	local r1, h1, v1, r2, h2, v2 = target1[4], target1[2], target1[3], target2[4], target2[2], target2[3]
-	local cos, sin = math.cos, math.sin
-	return math.sqrt(r1^2 + r2^2 - 2*r1*r2*(cos(v1)*cos(v2)*cos(h1 - h2) + sin(v1)*sin(v2)))
+	return sqrt(r1^2 + r2^2 - 2*r1*r2*(cos(v1)*cos(v2)*cos(h1 - h2) + sin(v1)*sin(v2)))
 end
 
 function sort_positives(arr)
@@ -269,7 +269,7 @@ end
 CONFIG = CONFIG or {
 	motor = {
 		vangle = 0,
-		hangle = -math.pi/2,
+		hangle = -pi/2,
 		velocity = 1,
 		strength = 5000
 	}, tracker = {
@@ -305,7 +305,7 @@ target_tracker = target_tracker or TargetTracker_new()
 target_finder_state = target_finder_state or SmartFindTargetState_new()
 
 local target = smart_find_target(target_finder_state, radar, function(v)
-	return v[4] * math.sin(v[3]) >= CONFIG.tracker.min_height
+	return v[4] * sin(v[3]) >= CONFIG.tracker.min_height
 		   and v[4] >= CONFIG.tracker.min_distance and v[4] <= CONFIG.tracker.max_distance
 end)
 
