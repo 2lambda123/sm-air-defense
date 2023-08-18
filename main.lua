@@ -100,6 +100,12 @@ function vec3_of_target(target)
 	return polar_to_vec3(target[4], target[2], target[3])
 end
 
+function dist_between_targets(target1, target2)
+	local r1, h1, v1, r2, h2, v2 = target1[4], target1[2], target1[3], target2[4], target2[2], target2[3]
+	local cos, sin = math.cos, math.sin
+	return math.sqrt(r1^2 + r2^2 - 2*r1*r2*(cos(v1)*cos(v2)*cos(h1 - h2) + sin(v1)*sin(v2)))
+end
+
 function sort_positives(arr)
 	table.sort(arr, function(a, b) return a > b end)
 	for i = #arr,1,-1 do
@@ -215,7 +221,7 @@ function calculate_aim(position, velocity, acceleration)
 end
 
 function SmartFindTargetState_new()
-	return { time = -math.huge, find_fn }
+	return { time = -math.huge, find_fn, target }
 end
 
 function smart_find_target(state, radar, fn)
@@ -225,10 +231,11 @@ function smart_find_target(state, radar, fn)
 	end
 	local target = find_target(radar, state.find_fn)
 	if target ~= nil then
-		state.find_fn = function(v) return v[1] == target[1] and fn(v) end
+		state.target = target
+		state.find_fn = function(v) return v[1] == state.target[1] and fn(v) end
 		state.time = os.clock()
-	else
-		find_target(radar, function(v) return  end)
+	elseif state.target ~= nil then
+		state.find_fn = function(v) return fn(v) and dist_between_targets(v, state.target) <= CONFIG.tracker.merge_max_distance end
 	end
 	return target
 end
