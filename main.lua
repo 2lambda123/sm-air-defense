@@ -220,7 +220,7 @@ function calculate_aim(position, velocity, acceleration)
 end
 
 function SmartFindTargetState_new()
-	return { time = -math.huge, find_fn, target }
+	return { time = -math.huge, find_fn }
 end
 
 function smart_find_target(state, radar, fn)
@@ -229,14 +229,10 @@ function smart_find_target(state, radar, fn)
 		state.time = math.huge
 	end
 	local target = find_target(radar, state.find_fn)
+
 	if target ~= nil then
-		state.target = target
-		state.find_fn = function(v) return v[1] == state.target[1] and fn(v) end
+		state.find_fn = function(v) return v[1] == target[1] and fn(v) end
 		state.time = os.clock()
-	elseif state.target ~= nil then
-		state.find_fn = function(v)
-			return v[1] == state.target[1] or dist_between_targets(v, state.target) <= CONFIG.tracker.merge_max_distance 
-		end
 	end
 	return target
 end
@@ -270,8 +266,8 @@ end
 
 CONFIG = CONFIG or {
 	motor = {
-		vangle = pi,
-		hangle = -pi/2,
+		vangle = 0,
+		hangle = pi/2,
 		velocity = 1,
 		strength = 5000
 	}, tracker = {
@@ -279,7 +275,6 @@ CONFIG = CONFIG or {
 		min_height = 0.5,
 		min_distance = 8,
 		max_distance = 350,
-		merge_max_distance = 2,
 		shutter_speed = 0.2
 	}, target = {
 		position = -sm.vec3.new(5.25, 0.25, 0.25),
@@ -289,7 +284,7 @@ CONFIG = CONFIG or {
 		speed = 84,
 		acceleration = 0
 	}, autolaunch = {
-		enable = false,
+		enable = true,
 		--aiming_time = 3.5,
 		aiming_time = 7,
 		stabilization_time = 0.15,
@@ -307,8 +302,7 @@ target_tracker = target_tracker or TargetTracker_new()
 target_finder_state = target_finder_state or SmartFindTargetState_new()
 
 local target = smart_find_target(target_finder_state, radar, function(v)
-	return v[4] * sin(v[3]) >= CONFIG.tracker.min_height
-		   and v[4] >= CONFIG.tracker.min_distance and v[4] <= CONFIG.tracker.max_distance
+	return v[4] * sin(v[3]) >= CONFIG.tracker.min_height and v[4] >= CONFIG.tracker.min_distance and v[4] <= CONFIG.tracker.max_distance
 end)
 
 if target == nil then
@@ -331,6 +325,8 @@ else
 	else
 		autolaunch_state = autolaunch_state or AutolaunchState_new()
 		local function launch_fn(cond)
+			local getreg = sci and sci.getreg or getreg
+			cond = cond and getreg("ALLOW_LAUNCH")
 			if sci then sci.setreg("LAUNCH", cond) else setreg("LAUNCH", cond) end
 		end
 		local function aim_fn(hangle, vangle)

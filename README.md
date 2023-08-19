@@ -11,7 +11,6 @@
 	- min_height (**type:** `number`): The minimum height of the target relative to the radar at which the target will be used
 	- min_distance (**type:** `number`): The minimum target distance relative to the radar at which the target will be used
 	- max_distance (**type:** `number`): The maximum target distance relative to the radar at which the target will be used
-	- merge_max_distance (**type:** `number`): If target A is at this distance relative to the targeted target B and if B is lost, then target A will be selected regardless of `expiration_time`
 	- shutter_speed (**type:** `number`): The period in seconds between snapshots of the target position
 - target
 	- position (**type:** `vec3`): The target position offset relative to the radar
