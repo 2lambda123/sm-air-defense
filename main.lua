@@ -74,7 +74,6 @@ function get_radar()
 end
 
 function get_motor(index)
-	index = index or 1
 	local motor = sci and sci.getMotors()[index] or getMotors()[index]
 	motor.setVelocity(CONFIG.motor.velocity)
 	motor.setStrength(CONFIG.motor.strength)
@@ -271,7 +270,7 @@ end
 
 CONFIG = CONFIG or {
 	motor = {
-		vangle = 0,
+		vangle = pi,
 		hangle = -pi/2,
 		velocity = 1,
 		strength = 5000
@@ -283,14 +282,14 @@ CONFIG = CONFIG or {
 		merge_max_distance = 2,
 		shutter_speed = 0.2
 	}, target = {
-		position = sm.vec3.new(28, 9, 4) / 4,
+		position = -sm.vec3.new(5.25, 0.25, 0.25),
 		velocity = sm.vec3.zero(),
 		acceleration = sm.vec3.new(0, 0, 39.24) / 4
 	}, projectile = {
 		speed = 84,
 		acceleration = 0
 	}, autolaunch = {
-		enable = true,
+		enable = false,
 		--aiming_time = 3.5,
 		aiming_time = 7,
 		stabilization_time = 0.15,
