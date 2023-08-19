@@ -266,6 +266,7 @@ function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
 			aim_fn(hangle, vangle)
 		end
 	end
+	--print(math.floor((time_since - aiming_time) * 100) / 100)
 end
 
 CONFIG = CONFIG or {
@@ -289,7 +290,7 @@ CONFIG = CONFIG or {
 		speed = 84,
 		acceleration = 0
 	}, autolaunch = {
-		enable = false,
+		enable = true,
 		--aiming_time = 3.5,
 		aiming_time = 7,
 		stabilization_time = 0.15,
@@ -330,12 +331,13 @@ else
 		vmotor.setAngle(SMA_update(angles_sma.vangle, vangle) + CONFIG.motor.vangle)
 	else
 		autolaunch_state = autolaunch_state or AutolaunchState_new()
-		local function launch_fn(cond) setreg("LAUNCH", cond) end
+		local function launch_fn(cond)
+			if sci then sci.setreg("LAUNCH", cond) else setreg("LAUNCH", cond) end
+		end
 		local function aim_fn(hangle, vangle)
 			hmotor.setAngle(hangle + CONFIG.motor.hangle)
 			vmotor.setAngle(vangle + CONFIG.motor.vangle)
 		end
 		autolaunch_start(autolaunch_state, aim_fn, launch_fn, hangle, vangle)
-		--print(math.floor((os.clock() - autolaunch_start_time - aiming_time) * 100) / 100)
 	end
 end
