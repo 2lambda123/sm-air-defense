@@ -33,4 +33,7 @@
 ```bash
 $ git submodule update --init --recursive
 $ lua lua-minify/minify.lua minify main.lua > main_minified.lua
+
+# Copy to clipboard (Windows)
+$ lua lua-minify/minify.lua minify main.lua | clip
 ```
