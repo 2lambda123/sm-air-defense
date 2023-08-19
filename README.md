@@ -12,6 +12,7 @@
 	- min_distance (**type:** `number`): The minimum target distance relative to the radar at which the target will be used
 	- max_distance (**type:** `number`): The maximum target distance relative to the radar at which the target will be used
 	- shutter_speed (**type:** `number`): The period in seconds between snapshots of the target position
+	- mean_coeffs (**type:** `{velocity: [0,1], acceleration: [0,1]}`): The EMA velocity/acceleration coefficients
 - target
 	- position (**type:** `vec3`): The target position offset relative to the radar
 	- velocity (**type:** `vec3`): The target velocity offset relative to the radar
@@ -25,3 +26,4 @@
 	- stabilization_time (**type:** `number`): The time in seconds before launch at which no actions will be performed
 	- min_launch_vangle (**type:** `number`): The minimum vertical launch angle
 	- min_aim_vangle (**type:** `number`): The minimum vertical aiming angle
+	- mean_coeffs (**type:** `{hangle: [0,1], vangle: [0,1]}`): The DEMA angles coefficients

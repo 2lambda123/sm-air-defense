@@ -167,9 +167,10 @@ end
 function DEMA_get(self) return self.result end
 
 function TargetTracker_new()
+	local coeffs = CONFIG.tracker.mean_coeffs
 	return {
 		tracked_positions = {}, last_time = os.clock(),
-		velocity_mean = EMA_new(2 / (4 + 1)), acceleration_mean = EMA_new(2 / (15 + 1))
+		velocity_mean = EMA_new(coeffs.velocity), acceleration_mean = EMA_new(coeffs.acceleration)
 	}
 end
 function TargetTracker_track(self, new_position)
@@ -231,14 +232,18 @@ function smart_find_target(state, radar, fn)
 	local target = find_target(radar, state.find_fn)
 
 	if target ~= nil then
-		state.find_fn = function(v) return v[1] == target[1] and fn(v) end
+		state.find_fn = function(v)
+			print(v[1], dist_between_targets(target, v))
+			return v[1] == target[1] and fn(v)
+		end
 		state.time = os.clock()
 	end
 	return target
 end
 
 function AutolaunchState_new()
-	return { start_time = os.clock(), angles_mean = { hangle = DEMA_new(0.12), vangle = DEMA_new(0.12) } }
+	local coeffs = CONFIG.autolaunch.mean_coeffs
+	return { start_time = os.clock(), angles_mean = { hangle = DEMA_new(coeffs.hangle), vangle = DEMA_new(coeffs.vangle) } }
 end
 function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
 	local time_since = os.clock() - state.start_time
@@ -275,7 +280,8 @@ CONFIG = CONFIG or {
 		min_height = 0.5,
 		min_distance = 8,
 		max_distance = 350,
-		shutter_speed = 0.2
+		shutter_speed = 0.2,
+		mean_coeffs = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
 	}, target = {
 		position = -sm.vec3.new(5.25, 0.25, 0.25),
 		velocity = sm.vec3.zero(),
@@ -289,7 +295,8 @@ CONFIG = CONFIG or {
 		aiming_time = 7,
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20),
-		min_aim_vangle = math.rad(5)
+		min_aim_vangle = math.rad(5),
+		mean_coeffs = { hangle = 0.12, vangle = 0.12 }
 	},
 }
 
