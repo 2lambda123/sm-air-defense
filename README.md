@@ -27,3 +27,10 @@
 	- min_launch_vangle (**type:** `number`): The minimum vertical launch angle
 	- min_aim_vangle (**type:** `number`): The minimum vertical aiming angle
 	- mean_coeffs (**type:** `{hangle: [0,1], vangle: [0,1]}`): The DEMA angles coefficients
+
+# Minification
+
+```bash
+$ git submodule update --init --recursive
+$ lua lua-minify/minify.lua minify main.lua > main_minified.lua
+```
