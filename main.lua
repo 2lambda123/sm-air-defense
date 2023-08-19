@@ -77,7 +77,7 @@ function get_motor(index)
 	local motor = sci and sci.getMotors()[index] or getMotors()[index]
 	motor.setVelocity(CONFIG.motor.velocity)
 	motor.setStrength(CONFIG.motor.strength)
-	--motor.setAngle(0)
+	motor.setAngle(0)
 	motor.setActive(true)
 	return motor
 end
@@ -233,7 +233,6 @@ function smart_find_target(state, radar, fn)
 
 	if target ~= nil then
 		state.find_fn = function(v)
-			print(v[1], dist_between_targets(target, v))
 			return v[1] == target[1] and fn(v)
 		end
 		state.time = os.clock()
