@@ -6,6 +6,9 @@ sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.ac
 function sqr_dot(vec)
 	return vec..':dot('..vec..')'
 end
+function sgn(x)
+	return x..'< 0 and -1 or 1'
+end
 
 function setreg(reg, value)
 	return (BUILD == 'SCI' and 'sci.setreg' or 'setreg')..'('..reg..','..value..')'
@@ -147,7 +150,7 @@ end
 
 function vec3_to_polar(vector)
 	local distance = vector:length()
-	local hangle = acos(vector.x / sqrt(vector.x^2 + vector.y^2)) * (vector.y < 0 and -1 or 1)
+	local hangle = acos(vector.x / sqrt(vector.x^2 + vector.y^2)) * @@sgn(vector.y)
 	local vangle = asin(vector.z / distance)
 	return distance, hangle, vangle
 end
