@@ -55,14 +55,14 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	return solutions
 end
 function find_target(radar, filter_fn)
-	for angle_mul=0,1 do
-		radar.setAngle(angle_mul * pi)
+	!for angle_mul=0,1 do
+		radar.setAngle(!(angle_mul) * pi)
 		for _, v in pairs(radar.getTargets()) do
 			if filter_fn(v) then
 				return v
 			end
 		end
-	end
+	!end
 	return nil
 end
 
@@ -265,7 +265,7 @@ function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
 			aim_fn(hangle, vangle)
 		end
 	end
-	--print(math.floor((time_since - aiming_time) * 100) / 100)
+	print(math.floor((time_since - aiming_time) * 100) / 100)
 end
 
 CONFIG = CONFIG or {
