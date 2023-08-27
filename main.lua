@@ -1,4 +1,59 @@
+!BUILD = "SCI"
+
 sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.acos, math.asin
+!(
+
+function sqr_dot(vec)
+	return vec..':dot('..vec..')'
+end
+
+function setreg(reg, value)
+	return (BUILD == 'SCI' and 'sci.setreg' or 'setreg')..'('..reg..','..value..')'
+end
+function getreg(reg)
+	return (BUILD == 'SCI' and 'sci.getreg' or 'getreg')..'('..reg..')'
+end
+function getRadars()
+	return (BUILD == 'SCI' and 'sci.getRadars()' or 'getRadars()')
+end
+function getMotors()
+	return (BUILD == 'SCI' and 'sci.getMotors()' or 'getMotors()')
+end
+
+CONFIG = {
+	motor = {
+		vangle = 0,
+		hangle = math.pi/2,
+		velocity = 1,
+		strength = 5000
+	}, tracker = {
+		expiration_time = 2,
+		min_height = 0.5,
+		min_distance = 8,
+		max_distance = 350,
+		shutter_speed = 0.2,
+		mean_coeffs = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
+	}, projectile = {
+		speed = 80,
+		acceleration = 0
+	}, autolaunch = {
+		enable = true,
+		--aiming_time = 3.5,
+		aiming_time = 7,
+		stabilization_time = 0.15,
+		min_launch_vangle = math.rad(20),
+		min_aim_vangle = math.rad(5),
+		mean_coeffs = { hangle = 0.12, vangle = 0.12 }
+	},
+}
+)
+CONFIG = CONFIG or { target = {
+		position = -sm.vec3.new(5.25, 0.25, 0.25),
+		velocity = sm.vec3.zero(),
+		acceleration = sm.vec3.new(0, 0, 39.24) / 4
+	}
+}
+
 function cbrt(x)
 	if x < 0 then return -((-x)^(1/3))
 	else return (x)^(1/3) end
@@ -55,11 +110,12 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	return solutions
 end
 function find_target(radar, filter_fn)
-	!for angle_mul=0,1 do
-		radar.setAngle(!(angle_mul) * pi)
-		for _, v in pairs(radar.getTargets()) do
-			if filter_fn(v) then
-				return v
+	!for _, angle in pairs({0, math.pi}) do
+		radar.setAngle(!(angle))
+		local targets = radar.getTargets()
+		for i=1,#targets do
+			if filter_fn(targets[i]) then
+				return targets[i]
 			end
 		end
 	!end
@@ -67,16 +123,16 @@ function find_target(radar, filter_fn)
 end
 
 function get_radar()
-	local radar = sci and sci.getRadars()[1] or getRadars()[1]
+	local radar = @@getRadars()[1]
 	radar.setHFov(pi)
 	radar.setVFov(pi)
 	return radar
 end
 
 function get_motor(index)
-	local motor = sci and sci.getMotors()[index] or getMotors()[index]
-	motor.setVelocity(CONFIG.motor.velocity)
-	motor.setStrength(CONFIG.motor.strength)
+	local motor = @@getMotors()[index]
+	motor.setVelocity(!(CONFIG.motor.velocity))
+	motor.setStrength(!(CONFIG.motor.strength))
 	motor.setAngle(0)
 	motor.setActive(true)
 	return motor
@@ -116,11 +172,11 @@ function sort_positives(arr)
 end
 
 function calculate_bullet_hit(position, velocity, acceleration, bullet_speed, bullet_acceleration)
-	local c0 = (acceleration:dot(acceleration) - bullet_acceleration^2) / 4
+	local c0 = (@@sqr_dot(acceleration) - bullet_acceleration^2) / 4
 	local c1 = velocity:dot(acceleration) - bullet_speed*bullet_acceleration
-	local c2 = position:dot(acceleration) + velocity:dot(velocity) - bullet_speed^2
+	local c2 = position:dot(acceleration) + @@sqr_dot(velocity) - bullet_speed^2
 	local c3 = 2*position:dot(velocity)
-	local c4 = position:dot(position)
+	local c4 = @@sqr_dot(position)
 	local solutions = solve_quartic(c0, c1, c2, c3, c4)
 
 	return sort_positives(solutions)
@@ -167,14 +223,14 @@ end
 function DEMA_get(self) return self.result end
 
 function TargetTracker_new()
-	local coeffs = CONFIG.tracker.mean_coeffs
+	local coeffs = !(CONFIG.tracker.mean_coeffs)
 	return {
 		tracked_positions = {}, last_time = os.clock(),
 		velocity_mean = EMA_new(coeffs.velocity), acceleration_mean = EMA_new(coeffs.acceleration)
 	}
 end
 function TargetTracker_track(self, new_position)
-	if os.clock() - self.last_time < CONFIG.tracker.shutter_speed then return end
+	if os.clock() - self.last_time < !(CONFIG.tracker.shutter_speed) then return end
 	self.last_time = os.clock()
 
 	self.tracked_positions[3] = self.tracked_positions[2]
@@ -187,7 +243,7 @@ function TargetTracker_track(self, new_position)
 end
 function TargetTracker_update(self)
 	local p = self.tracked_positions
-	local time = CONFIG.tracker.shutter_speed
+	local time = !(CONFIG.tracker.shutter_speed)
 
 	local vel2, vel1 = (p[2] - p[3]) / time, (p[1] - p[2]) / time
 	local accel = (vel2 - vel1) / (time*2)
@@ -211,7 +267,7 @@ function calculate_aim(position, velocity, acceleration)
 	velocity = velocity + CONFIG.target.velocity
 	acceleration = acceleration + CONFIG.target.acceleration
 	local t = calculate_bullet_hit(
-		position, velocity, acceleration, CONFIG.projectile.speed, CONFIG.projectile.acceleration
+		position, velocity, acceleration, !(CONFIG.projectile.speed), !(CONFIG.projectile.acceleration)
 	)[1]
 	if t == nil then return nil end
 
@@ -225,7 +281,7 @@ function SmartFindTargetState_new()
 end
 
 function smart_find_target(state, radar, fn)
-	if os.clock() - state.time > CONFIG.tracker.expiration_time then
+	if os.clock() - state.time > !(CONFIG.tracker.expiration_time) then
 		state.find_fn = function(v) return fn(v) end
 		state.time = math.huge
 	end
@@ -241,19 +297,19 @@ function smart_find_target(state, radar, fn)
 end
 
 function AutolaunchState_new()
-	local coeffs = CONFIG.autolaunch.mean_coeffs
+	local coeffs = !(CONFIG.autolaunch.mean_coeffs)
 	return { start_time = os.clock(), angles_mean = { hangle = DEMA_new(coeffs.hangle), vangle = DEMA_new(coeffs.vangle) } }
 end
 function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
 	local time_since = os.clock() - state.start_time
-	local aiming_time = CONFIG.autolaunch.aiming_time
+	local aiming_time = !(CONFIG.autolaunch.aiming_time)
 
 	if time_since >= aiming_time + 1 then
 		launch_fn(false)
 	elseif time_since >= aiming_time then
-		local can_launch = CONFIG.autolaunch.min_launch_vangle <= DEMA_get(state.angles_mean.vangle) + CONFIG.motor.vangle
+		local can_launch = !(CONFIG.autolaunch.min_launch_vangle) <= DEMA_get(state.angles_mean.vangle) + !(CONFIG.motor.vangle)
 		launch_fn(can_launch)
-	elseif time_since >= aiming_time - CONFIG.autolaunch.stabilization_time then
+	elseif time_since >= aiming_time - !(CONFIG.autolaunch.stabilization_time) then
 		launch_fn(false)
 		--print("DO NOTING")
 	else
@@ -261,43 +317,12 @@ function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
 		launch_fn(false)
 		local hangle = DEMA_update(state.angles_mean.hangle, new_hangle)
 		local vangle = DEMA_update(state.angles_mean.vangle, new_vangle)
-		if vangle >= CONFIG.autolaunch.min_aim_vangle then
+		if vangle >= !(CONFIG.autolaunch.min_aim_vangle) then
 			aim_fn(hangle, vangle)
 		end
 	end
 	print(math.floor((time_since - aiming_time) * 100) / 100)
 end
-
-CONFIG = CONFIG or {
-	motor = {
-		vangle = 0,
-		hangle = pi/2,
-		velocity = 1,
-		strength = 5000
-	}, tracker = {
-		expiration_time = 2,
-		min_height = 0.5,
-		min_distance = 8,
-		max_distance = 350,
-		shutter_speed = 0.2,
-		mean_coeffs = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
-	}, target = {
-		position = -sm.vec3.new(5.25, 0.25, 0.25),
-		velocity = sm.vec3.zero(),
-		acceleration = sm.vec3.new(0, 0, 39.24) / 4
-	}, projectile = {
-		speed = 80,
-		acceleration = 0
-	}, autolaunch = {
-		enable = true,
-		--aiming_time = 3.5,
-		aiming_time = 7,
-		stabilization_time = 0.15,
-		min_launch_vangle = math.rad(20),
-		min_aim_vangle = math.rad(5),
-		mean_coeffs = { hangle = 0.12, vangle = 0.12 }
-	},
-}
 
 local radar = get_radar()
 hmotor = hmotor or get_motor(1)
@@ -308,13 +333,13 @@ target_tracker = target_tracker or TargetTracker_new()
 target_finder_state = target_finder_state or SmartFindTargetState_new()
 
 local target = smart_find_target(target_finder_state, radar, function(v)
-	return v[4] * sin(v[3]) >= CONFIG.tracker.min_height and v[4] >= CONFIG.tracker.min_distance and v[4] <= CONFIG.tracker.max_distance
+	return v[4] * sin(v[3]) >= !(CONFIG.tracker.min_height) and v[4] >= !(CONFIG.tracker.min_distance) and v[4] <= !(CONFIG.tracker.max_distance)
 end)
 
 if target == nil then
-	if CONFIG.autolaunch.enable then
+	!if CONFIG.autolaunch.enable then
 		autolaunch_state = nil
-	end
+	!end
 else
 	local recent_position = vec3_of_target(target)
 
@@ -324,21 +349,19 @@ else
 	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration)
 	if distance == nil then return end
 
-	if not CONFIG.autolaunch.enable then
+	!if not CONFIG.autolaunch.enable then
 		angles_sma = angles_sma or { hangle = SMA_new(40), vangle = SMA_new(40) }
-		hmotor.setAngle(SMA_update(angles_sma.hangle, hangle) + CONFIG.motor.hangle)
-		vmotor.setAngle(SMA_update(angles_sma.vangle, vangle) + CONFIG.motor.vangle)
-	else
+		hmotor.setAngle(SMA_update(angles_sma.hangle, hangle) + !(CONFIG.motor.hangle))
+		vmotor.setAngle(SMA_update(angles_sma.vangle, vangle) + !(CONFIG.motor.vangle))
+	!else
 		autolaunch_state = autolaunch_state or AutolaunchState_new()
 		local function launch_fn(cond)
-			local getreg = sci and sci.getreg or getreg
-			cond = cond and getreg("ALLOW_LAUNCH")
-			if sci then sci.setreg("LAUNCH", cond) else setreg("LAUNCH", cond) end
+			@@setreg("LAUNCH", cond and @@getreg('ALLOW_LAUNCH'))
 		end
 		local function aim_fn(hangle, vangle)
-			hmotor.setAngle(hangle + CONFIG.motor.hangle)
-			vmotor.setAngle(vangle + CONFIG.motor.vangle)
+			hmotor.setAngle(hangle + !(CONFIG.motor.hangle))
+			vmotor.setAngle(vangle + !(CONFIG.motor.vangle))
 		end
 		autolaunch_start(autolaunch_state, aim_fn, launch_fn, hangle, vangle)
-	end
+	!end
 end
