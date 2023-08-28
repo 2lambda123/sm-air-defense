@@ -1,7 +1,7 @@
-!BUILD = "SCI"
 
-sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.acos, math.asin
 !(
+BUILD = require("ppdefs").BUILD
+VERBOSE = require("ppdefs").VERBOSE
 
 function sqr_dot(vec)
 	return ([[%s:dot(%s)]]):format(vec, vec)
@@ -66,6 +66,7 @@ CONFIG = CONFIG or { target = {
 		acceleration = sm.vec3.new(0, 0, 39.24) / 4
 	}
 }
+sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.acos, math.asin
 
 function cbrt(x)
 	if x < 0 then return -((-x)^(1/3))
@@ -352,16 +353,28 @@ if target ~= nil then
 			@@setreg("LAUNCH", false)
 		elseif time_since >= !(aiming_time) then
 			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= DEMA_get(autolaunch_state.vangle_mean)
+			!if VERBOSE then
+				if not can_launch then
+					print("CANNOT LAUNCH")
+				else
+					print("LAUNCHING")
+				end
+			!end
 			@@setreg("LAUNCH", can_launch and @@getreg('ALLOW_LAUNCH'))
 		elseif time_since >= !(aiming_time - CONFIG.autolaunch.stabilization_time) then
 			@@setreg("LAUNCH", false)
+			!if VERBOSE then
+				print("WAITING")
+			!end
 		else
 			@@setreg("LAUNCH", false)
 			local dema_hangle = DEMA_update(autolaunch_state.hangle_mean, hangle)
 			local dema_vangle = DEMA_update(autolaunch_state.vangle_mean, vangle)
 			@@hmotor_setAngle(hmotor, dema_hangle)
 			@@vmotor_setAngle(vmotor, dema_vangle)
+			!if VERBOSE then
+				print(math.floor((time_since - !(aiming_time)) * 10) / 10) 
+			!end
 		end
-		--print(math.floor((time_since - aiming_time) * 100) / 100)
 	!end
 end
