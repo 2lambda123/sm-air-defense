@@ -4,17 +4,17 @@ sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.ac
 !(
 
 function sqr_dot(vec)
-	return vec..':dot('..vec..')'
+	return ([[%s:dot(%s)]]):format(vec, vec)
 end
 function sgn(x)
-	return x..'< 0 and -1 or 1'
+	return ([[(%s < 0 and -1 or 1)]]):format(x)
 end
 
 function setreg(reg, value)
-	return (BUILD == 'SCI' and 'sci.setreg' or 'setreg')..'('..reg..','..value..')'
+	return ([[%s(%s,%s)]]):format(BUILD == 'SCI' and 'sci.setreg' or 'setreg', reg, value)
 end
 function getreg(reg)
-	return (BUILD == 'SCI' and 'sci.getreg' or 'getreg')..'('..reg..')'
+	return ([[%s(%s)]]):format(BUILD == 'SCI' and 'sci.getreg' or 'getreg', reg)
 end
 function getRadars()
 	return (BUILD == 'SCI' and 'sci.getRadars()' or 'getRadars()')
@@ -27,6 +27,7 @@ CONFIG = {
 	motor = {
 		vangle = 0,
 		hangle = math.pi/2,
+		--hangle = 0,
 		velocity = 1,
 		strength = 5000
 	}, tracker = {
@@ -299,34 +300,6 @@ function smart_find_target(state, radar, fn)
 	return target
 end
 
-function AutolaunchState_new()
-	local coeffs = !(CONFIG.autolaunch.mean_coeffs)
-	return { start_time = os.clock(), angles_mean = { hangle = DEMA_new(coeffs.hangle), vangle = DEMA_new(coeffs.vangle) } }
-end
-function autolaunch_start(state, aim_fn, launch_fn, new_hangle, new_vangle)
-	local time_since = os.clock() - state.start_time
-	local aiming_time = !(CONFIG.autolaunch.aiming_time)
-
-	if time_since >= aiming_time + 1 then
-		launch_fn(false)
-	elseif time_since >= aiming_time then
-		local can_launch = !(CONFIG.autolaunch.min_launch_vangle) <= DEMA_get(state.angles_mean.vangle) + !(CONFIG.motor.vangle)
-		launch_fn(can_launch)
-	elseif time_since >= aiming_time - !(CONFIG.autolaunch.stabilization_time) then
-		launch_fn(false)
-		--print("DO NOTING")
-	else
-		--print("AIMING")
-		launch_fn(false)
-		local hangle = DEMA_update(state.angles_mean.hangle, new_hangle)
-		local vangle = DEMA_update(state.angles_mean.vangle, new_vangle)
-		if vangle >= !(CONFIG.autolaunch.min_aim_vangle) then
-			aim_fn(hangle, vangle)
-		end
-	end
-	print(math.floor((time_since - aiming_time) * 100) / 100)
-end
-
 local radar = get_radar()
 hmotor = hmotor or get_motor(1)
 vmotor = vmotor or get_motor(2)
@@ -339,11 +312,13 @@ local target = smart_find_target(target_finder_state, radar, function(v)
 	return v[4] * sin(v[3]) >= !(CONFIG.tracker.min_height) and v[4] >= !(CONFIG.tracker.min_distance) and v[4] <= !(CONFIG.tracker.max_distance)
 end)
 
-if target == nil then
-	!if CONFIG.autolaunch.enable then
+!if CONFIG.autolaunch.enable then
+	if target == nil then
 		autolaunch_state = nil
-	!end
-else
+	end
+!end
+
+if target ~= nil then
 	local recent_position = vec3_of_target(target)
 
 	TargetTracker_track(target_tracker, recent_position)
@@ -351,20 +326,34 @@ else
 	local target_velocity, target_acceleration = TargetTracker_velocity(target_tracker), TargetTracker_acceleration(target_tracker)
 	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration)
 	if distance == nil then return end
-
+	
 	!if not CONFIG.autolaunch.enable then
 		angles_sma = angles_sma or { hangle = SMA_new(40), vangle = SMA_new(40) }
 		hmotor.setAngle(SMA_update(angles_sma.hangle, hangle) + !(CONFIG.motor.hangle))
 		vmotor.setAngle(SMA_update(angles_sma.vangle, vangle) + !(CONFIG.motor.vangle))
 	!else
-		autolaunch_state = autolaunch_state or AutolaunchState_new()
-		local function launch_fn(cond)
-			@@setreg("LAUNCH", cond and @@getreg('ALLOW_LAUNCH'))
+		!local coeffs = CONFIG.autolaunch.mean_coeffs
+		autolaunch_state = autolaunch_state or {
+			start_time = os.clock(), hangle_mean = DEMA_new(!(coeffs.hangle)), vangle_mean = DEMA_new(!(coeffs.vangle))
+		}
+		local time_since = os.clock() - autolaunch_state.start_time
+		!local aiming_time = CONFIG.autolaunch.aiming_time
+		if time_since >= !(aiming_time + 1) then
+			@@setreg("LAUNCH", false)
+		elseif time_since >= !(aiming_time) then
+			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= DEMA_get(autolaunch_state.vangle_mean)
+			@@setreg("LAUNCH", can_launch and @@getreg('ALLOW_LAUNCH'))
+		elseif time_since >= !(aiming_time - CONFIG.autolaunch.stabilization_time) then
+			@@setreg("LAUNCH", false)
+		else
+			@@setreg("LAUNCH", false)
+			local dema_hangle = DEMA_update(autolaunch_state.hangle_mean, hangle)
+			local dema_vangle = DEMA_update(autolaunch_state.vangle_mean, vangle)
+			if vangle >= !(CONFIG.autolaunch.min_aim_vangle) then
+				hmotor.setAngle(dema_hangle + !(CONFIG.motor.hangle))
+				vmotor.setAngle(dema_vangle + !(CONFIG.motor.vangle))
+			end
 		end
-		local function aim_fn(hangle, vangle)
-			hmotor.setAngle(hangle + !(CONFIG.motor.hangle))
-			vmotor.setAngle(vangle + !(CONFIG.motor.vangle))
-		end
-		autolaunch_start(autolaunch_state, aim_fn, launch_fn, hangle, vangle)
+		--print(math.floor((time_since - aiming_time) * 100) / 100)
 	!end
 end
