@@ -22,6 +22,14 @@ end
 function getMotors()
 	return (BUILD == 'SCI' and 'sci.getMotors()' or 'getMotors()')
 end
+function hmotor_setAngle(motor, angle)
+	return ([[%s.setAngle(%s+%s)]]):format(motor, angle, CONFIG.motor.hangle)
+end
+function vmotor_setAngle(motor, angle)
+	return ([[
+		if %s >= %s then %s.setAngle(%s+%s) end
+	]]):format(angle, CONFIG.motor.min_vangle + CONFIG.motor.vangle, motor, angle, CONFIG.motor.vangle)
+end
 
 CONFIG = {
 	motor = {
@@ -29,7 +37,9 @@ CONFIG = {
 		hangle = math.pi/2,
 		--hangle = 0,
 		velocity = 1,
-		strength = 5000
+		strength = 5000,
+		index = { hmotor = 1, vmotor = 2 },
+		min_vangle = math.rad(10),
 	}, tracker = {
 		expiration_time = 2,
 		min_height = 0.5,
@@ -46,7 +56,6 @@ CONFIG = {
 		aiming_time = 7,
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20),
-		min_aim_vangle = math.rad(5),
 		mean = { hangle = 0.12, vangle = 0.12 }
 	},
 }
@@ -133,11 +142,11 @@ function get_radar()
 	return radar
 end
 
-function get_motor(index)
+function get_motor(index, default_angle)
 	local motor = @@getMotors()[index]
 	motor.setVelocity(!(CONFIG.motor.velocity))
 	motor.setStrength(!(CONFIG.motor.strength))
-	motor.setAngle(0)
+	motor.setAngle(default_angle)
 	motor.setActive(true)
 	return motor
 end
@@ -301,8 +310,8 @@ function smart_find_target(state, radar, fn)
 end
 
 local radar = get_radar()
-hmotor = hmotor or get_motor(1)
-vmotor = vmotor or get_motor(2)
+hmotor = hmotor or get_motor(!(CONFIG.motor.index.hmotor), 0)
+vmotor = vmotor or get_motor(!(CONFIG.motor.index.vmotor), !(CONFIG.motor.min_vangle))
 
 target_tracker = target_tracker or TargetTracker_new()
 
@@ -329,8 +338,9 @@ if target ~= nil then
 	
 	!if not CONFIG.autolaunch.enable then
 		angles_sma = angles_sma or { hangle = SMA_new(40), vangle = SMA_new(40) }
-		hmotor.setAngle(SMA_update(angles_sma.hangle, hangle) + !(CONFIG.motor.hangle))
-		vmotor.setAngle(SMA_update(angles_sma.vangle, vangle) + !(CONFIG.motor.vangle))
+		local sma_hangle, sma_vangle = SMA_update(angles_sma.hangle, hangle), SMA_update(angles_sma.vangle, vangle)
+		@@hmotor_setAngle(hmotor, sma_hangle)
+		@@vmotor_setAngle(vmotor, sma_vangle)
 	!else
 		!local coeffs = CONFIG.autolaunch.mean
 		autolaunch_state = autolaunch_state or {
@@ -349,10 +359,8 @@ if target ~= nil then
 			@@setreg("LAUNCH", false)
 			local dema_hangle = DEMA_update(autolaunch_state.hangle_mean, hangle)
 			local dema_vangle = DEMA_update(autolaunch_state.vangle_mean, vangle)
-			if vangle >= !(CONFIG.autolaunch.min_aim_vangle) then
-				hmotor.setAngle(dema_hangle + !(CONFIG.motor.hangle))
-				vmotor.setAngle(dema_vangle + !(CONFIG.motor.vangle))
-			end
+			@@hmotor_setAngle(hmotor, dema_hangle)
+			@@vmotor_setAngle(vmotor, dema_vangle)
 		end
 		--print(math.floor((time_since - aiming_time) * 100) / 100)
 	!end
