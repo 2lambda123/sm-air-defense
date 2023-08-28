@@ -36,7 +36,7 @@ CONFIG = {
 		min_distance = 8,
 		max_distance = 350,
 		shutter_speed = 0.2,
-		mean_coeffs = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
+		mean = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
 	}, projectile = {
 		speed = 80,
 		acceleration = 0
@@ -47,7 +47,7 @@ CONFIG = {
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20),
 		min_aim_vangle = math.rad(5),
-		mean_coeffs = { hangle = 0.12, vangle = 0.12 }
+		mean = { hangle = 0.12, vangle = 0.12 }
 	},
 }
 )
@@ -227,7 +227,7 @@ end
 function DEMA_get(self) return self.result end
 
 function TargetTracker_new()
-	local coeffs = !(CONFIG.tracker.mean_coeffs)
+	local coeffs = !(CONFIG.tracker.mean)
 	return {
 		tracked_positions = {}, last_time = os.clock(),
 		velocity_mean = EMA_new(coeffs.velocity), acceleration_mean = EMA_new(coeffs.acceleration)
@@ -332,7 +332,7 @@ if target ~= nil then
 		hmotor.setAngle(SMA_update(angles_sma.hangle, hangle) + !(CONFIG.motor.hangle))
 		vmotor.setAngle(SMA_update(angles_sma.vangle, vangle) + !(CONFIG.motor.vangle))
 	!else
-		!local coeffs = CONFIG.autolaunch.mean_coeffs
+		!local coeffs = CONFIG.autolaunch.mean
 		autolaunch_state = autolaunch_state or {
 			start_time = os.clock(), hangle_mean = DEMA_new(!(coeffs.hangle)), vangle_mean = DEMA_new(!(coeffs.vangle))
 		}
