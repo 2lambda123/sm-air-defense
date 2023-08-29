@@ -233,15 +233,18 @@ function EMA_get(self) return ([[%s.result]]):format(self) end
 function EMA_set(self, value) return ([[%s.result = %s]]):format(self, value) end
 )
 
+!(
 function TargetTracker_new()
-	return {
-		tracked_positions = {}, last_time = os.clock(),
-		velocity_mean = @@EMA_new(), acceleration_mean = @@EMA_new(),
-		samples_count = 0,
-	}
+	return ([[{
+		tracked_positions = {}, last_time = -math.huge,
+		velocity_mean = %s, acceleration_mean = %s,
+		samples_count = 0
+	}]]):format(EMA_new(), EMA_new())
 end
-function TargetTracker_track(self, new_position)
+)
+function TargetTracker_track(self, target, new_position)
 	if os.clock() - self.last_time < !(CONFIG.tracker.shutter_speed) then return end
+
 	self.last_time = os.clock()
 	self.samples_count = self.samples_count + 1
 
@@ -255,13 +258,13 @@ function TargetTracker_track(self, new_position)
 end
 function TargetTracker_update(self)
 	local p = self.tracked_positions
-	local time = !(CONFIG.tracker.shutter_speed)
+	!local time = CONFIG.tracker.shutter_speed
 
-	local vel2, vel1 = (p[2] - p[3]) / time, (p[1] - p[2]) / time
-	local accel = (vel2 - vel1) / (time*2)
+	local vel2, vel1 = (p[2] - p[3]) / !(time), (p[1] - p[2]) / !(time)
+	local accel = (vel2 - vel1) / !(time*2)
 
 	if @@EMA_get(self.velocity_mean) ~= nil then
-		@@EMA_set(self.velocity_mean, @@EMA_get(self.velocity_mean) + @@EMA_get(self.acceleration_mean)*time)
+		@@EMA_set(self.velocity_mean, @@EMA_get(self.velocity_mean) + @@EMA_get(self.acceleration_mean)*!(time))
 	end
 
 	!local coeffs = CONFIG.tracker.mean
@@ -270,10 +273,10 @@ function TargetTracker_update(self)
 end
 !(
 function TargetTracker_velocity(self)
-	return ([[(EMA_get(%s.velocity_mean) or sm.vec3.zero())]]):format(self)
+	return ([[(%s or sm.vec3.zero())]]):format(EMA_get(self..'.velocity_mean'), self)
 end
 function TargetTracker_acceleration(self)
-	return ([[(EMA_get(%s.acceleration_mean) or sm.vec3.zero())]]):format(self)
+	return ([[(%s or sm.vec3.zero())]]):format(EMA_get(self..'.acceleration_mean'), self)
 end
 function TargetTracker_samples_number(self)
 	return ([[%s.samples_count]]):format(self)
@@ -294,14 +297,17 @@ function calculate_aim(position, velocity, acceleration)
 	return distance, hangle, vangle
 end
 
-function SmartFindTargetState_new()
-	return { time = -math.huge, find_fn }
+!(
+function SmartFindTargetState_new(on_new_find)
+	return ([[{ time = -math.huge, find_fn, on_new_find = %s }]]):format(on_new_find)
 end
+)
 
 function smart_find_target(state, radar, fn)
 	if os.clock() - state.time > !(CONFIG.tracker.expiration_time) then
 		state.find_fn = function(v) return fn(v) end
 		state.time = math.huge
+		state.on_new_find()
 	end
 	local target = find_target(radar, state.find_fn)
 
@@ -316,9 +322,9 @@ local radar = get_radar()
 hmotor = hmotor or get_motor(!(CONFIG.motor.index.hmotor), 0)
 vmotor = vmotor or get_motor(!(CONFIG.motor.index.vmotor), !(CONFIG.motor.min_vangle))
 
-target_tracker = target_tracker or TargetTracker_new()
-
-target_finder_state = target_finder_state or SmartFindTargetState_new()
+target_finder_state = target_finder_state or @@SmartFindTargetState_new(function()
+	target_tracker = @@TargetTracker_new()
+end)
 
 local target = smart_find_target(target_finder_state, radar, function(v)
 	return v[4] * sin(v[3]) >= !(CONFIG.tracker.min_height) and v[4] >= !(CONFIG.tracker.min_distance) and v[4] <= !(CONFIG.tracker.max_distance)
@@ -327,8 +333,7 @@ end)
 if target ~= nil then
 	local recent_position = vec3_of_target(target)
 
-	TargetTracker_track(target_tracker, recent_position)
-
+	TargetTracker_track(target_tracker, target, recent_position)
 	local target_velocity, target_acceleration = @@TargetTracker_velocity(target_tracker), @@TargetTracker_acceleration(target_tracker)
 	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration)
 	if distance == nil then return end
