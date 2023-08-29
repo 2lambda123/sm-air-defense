@@ -324,6 +324,9 @@ vmotor = vmotor or get_motor(!(CONFIG.motor.index.vmotor), !(CONFIG.motor.min_va
 
 target_finder_state = target_finder_state or @@SmartFindTargetState_new(function()
 	target_tracker = @@TargetTracker_new()
+	!if CONFIG.autolaunch.enable then
+		autolaunch_state = nil
+	!end
 end)
 
 local target = smart_find_target(target_finder_state, radar, function(v)
@@ -344,9 +347,7 @@ if target ~= nil then
 		@@hmotor_setAngle(hmotor, sma_hangle)
 		@@vmotor_setAngle(vmotor, sma_vangle)
 	!else
-		autolaunch_state = autolaunch_state or {
-			start_time = math.huge
-		}
+		autolaunch_state = autolaunch_state or { start_time = math.huge }
 
 		local time_since = os.clock() - autolaunch_state.start_time
 		local position_samples = @@TargetTracker_samples_number(target_tracker)
