@@ -47,7 +47,7 @@ CONFIG = {
 		expiration_time = 2,
 		min_height = 0.5,
 		min_distance = 8,
-		max_distance = 150,
+		max_distance = 200,
 		shutter_speed = 0.2,
 		mean = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
 	}, projectile = {
@@ -55,10 +55,9 @@ CONFIG = {
 		acceleration = 0
 	}, autolaunch = {
 		enable = true,
-		position_samples_number = 200,
+		position_samples_number = 40,
 		stabilization_time = 0.15,
-		min_launch_vangle = math.rad(20),
-		mean = { hangle = 0.12, vangle = 0.12 }
+		min_launch_vangle = math.rad(20)
 	},
 }
 )
@@ -220,35 +219,31 @@ function CA_update(self, value)
 end
 function CA_get(self) return self.result end
 
-function EMA_new(smoothing_constant)
-	return { alpha = smoothing_constant, result}
-end
-function EMA_update(self, value)
-	self.result = value * self.alpha + (self.result or value) * (1 - self.alpha)
-	return self.result
-end
-function EMA_get(self) return self.result end
-function EMA_set(self, value) self.result = value end
 
-function DEMA_new(a)
-	return { result, alpha = a, result_ema = EMA_new(a) }
+!(
+function EMA_new()
+	return ([[{ result }]])
 end
-function DEMA_update(self, value)
-	self.result = EMA_update(self.result_ema, value) * self.alpha + (self.result or value) * (1 - self.alpha)
-	return self.result
+function EMA_update(self, value, alpha)
+	return ([[
+		%s.result = %s * %s + (%s.result or %s) * %s
+	]]):format(self, value, alpha, self, value, 1 - alpha)
 end
-function DEMA_get(self) return self.result end
+function EMA_get(self) return ([[%s.result]]):format(self) end
+function EMA_set(self, value) return ([[%s.result = %s]]):format(self, value) end
+)
 
 function TargetTracker_new()
-	local coeffs = !(CONFIG.tracker.mean)
 	return {
 		tracked_positions = {}, last_time = os.clock(),
-		velocity_mean = EMA_new(coeffs.velocity), acceleration_mean = EMA_new(coeffs.acceleration)
+		velocity_mean = @@EMA_new(), acceleration_mean = @@EMA_new(),
+		samples_count = 0,
 	}
 end
 function TargetTracker_track(self, new_position)
 	if os.clock() - self.last_time < !(CONFIG.tracker.shutter_speed) then return end
 	self.last_time = os.clock()
+	self.samples_count = self.samples_count + 1
 
 	self.tracked_positions[3] = self.tracked_positions[2]
 	self.tracked_positions[2] = self.tracked_positions[1]
@@ -265,19 +260,25 @@ function TargetTracker_update(self)
 	local vel2, vel1 = (p[2] - p[3]) / time, (p[1] - p[2]) / time
 	local accel = (vel2 - vel1) / (time*2)
 
-	if EMA_get(self.velocity_mean) ~= nil then
-		EMA_set(self.velocity_mean, EMA_get(self.velocity_mean) + EMA_get(self.acceleration_mean)*time)
+	if @@EMA_get(self.velocity_mean) ~= nil then
+		@@EMA_set(self.velocity_mean, @@EMA_get(self.velocity_mean) + @@EMA_get(self.acceleration_mean)*time)
 	end
 
-	EMA_update(self.velocity_mean, vel1)
-	EMA_update(self.acceleration_mean, accel)
+	!local coeffs = CONFIG.tracker.mean
+	@@EMA_update(self.velocity_mean, vel1, !(coeffs.velocity))
+	@@EMA_update(self.acceleration_mean, accel, !(coeffs.acceleration))
 end
+!(
 function TargetTracker_velocity(self)
-	return EMA_get(self.velocity_mean) or sm.vec3.zero()
+	return ([[(EMA_get(%s.velocity_mean) or sm.vec3.zero())]]):format(self)
 end
 function TargetTracker_acceleration(self)
-	return EMA_get(self.acceleration_mean) or sm.vec3.zero()
+	return ([[(EMA_get(%s.acceleration_mean) or sm.vec3.zero())]]):format(self)
 end
+function TargetTracker_samples_number(self)
+	return ([[%s.samples_count]]):format(self)
+end
+)
 
 function calculate_aim(position, velocity, acceleration)
 	position = position + CONFIG.target.position
@@ -328,7 +329,7 @@ if target ~= nil then
 
 	TargetTracker_track(target_tracker, recent_position)
 
-	local target_velocity, target_acceleration = TargetTracker_velocity(target_tracker), TargetTracker_acceleration(target_tracker)
+	local target_velocity, target_acceleration = @@TargetTracker_velocity(target_tracker), @@TargetTracker_acceleration(target_tracker)
 	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration)
 	if distance == nil then return end
 
@@ -338,20 +339,17 @@ if target ~= nil then
 		@@hmotor_setAngle(hmotor, sma_hangle)
 		@@vmotor_setAngle(vmotor, sma_vangle)
 	!else
-		!local coeffs = CONFIG.autolaunch.mean
 		autolaunch_state = autolaunch_state or {
-			position_samples = 0, start_time = math.huge,
-			hangle_mean = DEMA_new(!(coeffs.hangle)), vangle_mean = DEMA_new(!(coeffs.vangle))
+			start_time = math.huge
 		}
-		autolaunch_state.position_samples = autolaunch_state.position_samples + 1
 
 		local time_since = os.clock() - autolaunch_state.start_time
-		local position_samples = autolaunch_state.position_samples
+		local position_samples = @@TargetTracker_samples_number(target_tracker)
 		!local required_samples_number = CONFIG.autolaunch.position_samples_number
 		if time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
 			@@setreg("LAUNCH", false)
 		elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
-			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= DEMA_get(autolaunch_state.vangle_mean)
+			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
 			!if VERBOSE then
 				if @@getreg('ALLOW_LAUNCH') == 0 then
 					print("NOT ALLOWED TO LAUNCH")
@@ -370,10 +368,8 @@ if target ~= nil then
 			autolaunch_state.start_time = os.clock()
 		else
 			@@setreg("LAUNCH", false)
-			local dema_hangle = DEMA_update(autolaunch_state.hangle_mean, hangle)
-			local dema_vangle = DEMA_update(autolaunch_state.vangle_mean, vangle)
-			@@hmotor_setAngle(hmotor, dema_hangle)
-			@@vmotor_setAngle(vmotor, dema_vangle)
+			@@hmotor_setAngle(hmotor, hangle)
+			@@vmotor_setAngle(vmotor, vangle)
 			!if VERBOSE then
 				print(('[%d/%d] (%d%%)'):format(position_samples, !(required_samples_number), 100 * position_samples / !(required_samples_number)))
 			!end
