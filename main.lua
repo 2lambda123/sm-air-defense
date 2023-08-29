@@ -55,7 +55,7 @@ CONFIG = {
 		acceleration = 0
 	}, autolaunch = {
 		enable = true,
-		position_samples_number = 40,
+		position_samples_number = 15,
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20)
 	},
