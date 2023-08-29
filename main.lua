@@ -17,10 +17,13 @@ function getreg(reg)
 	return ([[%s(%s)]]):format(BUILD == 'SCI' and 'sci.getreg' or 'getreg', reg)
 end
 function getRadars()
-	return (BUILD == 'SCI' and 'sci.getRadars()' or 'getRadars()')
+	return BUILD == 'SCI' and 'sci.getRadars()' or 'getRadars()'
 end
 function getMotors()
-	return (BUILD == 'SCI' and 'sci.getMotors()' or 'getMotors()')
+	return BUILD == 'SCI' and 'sci.getMotors()' or 'getMotors()'
+end
+function getCameras()
+	return BUILD == 'SCI' and 'sci.getCameras()' or 'getCameras()'
 end
 function hmotor_setAngle(motor, angle)
 	return ([[%s.setAngle(%s+%s)]]):format(motor, angle, CONFIG.motor.hangle)
@@ -52,8 +55,7 @@ CONFIG = {
 		acceleration = 0
 	}, autolaunch = {
 		enable = true,
-		--aiming_time = 3.5,
-		aiming_time = 7,
+		aiming_time = 3.5,
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20),
 		mean = { hangle = 0.12, vangle = 0.12 }
@@ -124,6 +126,7 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	return solutions
 end
 function find_target(radar, filter_fn)
+	-- targets structure { [1] = id, [2] = hangle, [3] = vangle, [4] = distance, [5] = force }
 	!for _, angle in pairs({0, math.pi}) do
 		radar.setAngle(!(angle))
 		local targets = radar.getTargets()
@@ -302,9 +305,7 @@ function smart_find_target(state, radar, fn)
 	local target = find_target(radar, state.find_fn)
 
 	if target ~= nil then
-		state.find_fn = function(v)
-			return v[1] == target[1] and fn(v)
-		end
+		state.find_fn = function (v) return v[1] == target[1] and fn(v) end
 		state.time = os.clock()
 	end
 	return target
@@ -323,9 +324,7 @@ local target = smart_find_target(target_finder_state, radar, function(v)
 end)
 
 !if CONFIG.autolaunch.enable then
-	if target == nil then
-		autolaunch_state = nil
-	end
+	if target == nil then autolaunch_state = nil end
 !end
 
 if target ~= nil then
@@ -354,7 +353,9 @@ if target ~= nil then
 		elseif time_since >= !(aiming_time) then
 			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= DEMA_get(autolaunch_state.vangle_mean)
 			!if VERBOSE then
-				if not can_launch then
+				if @@getreg('ALLOW_LAUNCH') == 0 then
+					print("NOT ALLOWED TO LAUNCH")
+				elseif not can_launch then
 					print("CANNOT LAUNCH")
 				else
 					print("LAUNCHING")
@@ -373,7 +374,7 @@ if target ~= nil then
 			@@hmotor_setAngle(hmotor, dema_hangle)
 			@@vmotor_setAngle(vmotor, dema_vangle)
 			!if VERBOSE then
-				print(math.floor((time_since - !(aiming_time)) * 10) / 10) 
+				print(math.floor((time_since - !(aiming_time)) * 100) / 100)
 			!end
 		end
 	!end
