@@ -47,7 +47,7 @@ CONFIG = {
 		expiration_time = 2,
 		min_height = 0.5,
 		min_distance = 8,
-		max_distance = 200,
+		max_distance = 250,
 		shutter_speed = 0.2,
 		mean = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
 	}, projectile = {
