@@ -47,7 +47,7 @@ CONFIG = {
 		expiration_time = 2,
 		min_height = 0.5,
 		min_distance = 8,
-		max_distance = 350,
+		max_distance = 150,
 		shutter_speed = 0.2,
 		mean = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) }
 	}, projectile = {
@@ -55,7 +55,7 @@ CONFIG = {
 		acceleration = 0
 	}, autolaunch = {
 		enable = true,
-		aiming_time = 3.5,
+		position_samples_number = 200,
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20),
 		mean = { hangle = 0.12, vangle = 0.12 }
@@ -323,10 +323,6 @@ local target = smart_find_target(target_finder_state, radar, function(v)
 	return v[4] * sin(v[3]) >= !(CONFIG.tracker.min_height) and v[4] >= !(CONFIG.tracker.min_distance) and v[4] <= !(CONFIG.tracker.max_distance)
 end)
 
-!if CONFIG.autolaunch.enable then
-	if target == nil then autolaunch_state = nil end
-!end
-
 if target ~= nil then
 	local recent_position = vec3_of_target(target)
 
@@ -335,7 +331,7 @@ if target ~= nil then
 	local target_velocity, target_acceleration = TargetTracker_velocity(target_tracker), TargetTracker_acceleration(target_tracker)
 	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration)
 	if distance == nil then return end
-	
+
 	!if not CONFIG.autolaunch.enable then
 		angles_sma = angles_sma or { hangle = SMA_new(40), vangle = SMA_new(40) }
 		local sma_hangle, sma_vangle = SMA_update(angles_sma.hangle, hangle), SMA_update(angles_sma.vangle, vangle)
@@ -344,13 +340,17 @@ if target ~= nil then
 	!else
 		!local coeffs = CONFIG.autolaunch.mean
 		autolaunch_state = autolaunch_state or {
-			start_time = os.clock(), hangle_mean = DEMA_new(!(coeffs.hangle)), vangle_mean = DEMA_new(!(coeffs.vangle))
+			position_samples = 0, start_time = math.huge,
+			hangle_mean = DEMA_new(!(coeffs.hangle)), vangle_mean = DEMA_new(!(coeffs.vangle))
 		}
+		autolaunch_state.position_samples = autolaunch_state.position_samples + 1
+
 		local time_since = os.clock() - autolaunch_state.start_time
-		!local aiming_time = CONFIG.autolaunch.aiming_time
-		if time_since >= !(aiming_time + 1) then
+		local position_samples = autolaunch_state.position_samples
+		!local required_samples_number = CONFIG.autolaunch.position_samples_number
+		if time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
 			@@setreg("LAUNCH", false)
-		elseif time_since >= !(aiming_time) then
+		elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
 			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= DEMA_get(autolaunch_state.vangle_mean)
 			!if VERBOSE then
 				if @@getreg('ALLOW_LAUNCH') == 0 then
@@ -362,11 +362,12 @@ if target ~= nil then
 				end
 			!end
 			@@setreg("LAUNCH", can_launch and @@getreg('ALLOW_LAUNCH'))
-		elseif time_since >= !(aiming_time - CONFIG.autolaunch.stabilization_time) then
-			@@setreg("LAUNCH", false)
-			!if VERBOSE then
-				print("WAITING")
-			!end
+		!if VERBOSE then
+		elseif time_since >= 0 then
+			print("WAITING")
+		!end
+		elseif position_samples == !(required_samples_number) then
+			autolaunch_state.start_time = os.clock()
 		else
 			@@setreg("LAUNCH", false)
 			local dema_hangle = DEMA_update(autolaunch_state.hangle_mean, hangle)
@@ -374,7 +375,7 @@ if target ~= nil then
 			@@hmotor_setAngle(hmotor, dema_hangle)
 			@@vmotor_setAngle(vmotor, dema_vangle)
 			!if VERBOSE then
-				print(math.floor((time_since - !(aiming_time)) * 100) / 100)
+				print(('[%d/%d] (%d%%)'):format(position_samples, !(required_samples_number), 100 * position_samples / !(required_samples_number)))
 			!end
 		end
 	!end
