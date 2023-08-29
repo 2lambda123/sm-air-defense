@@ -64,7 +64,7 @@ CONFIG = {
 CONFIG = CONFIG or { target = {
 		position = -sm.vec3.new(5.25, 0.25, 0.25),
 		velocity = sm.vec3.zero(),
-		acceleration = sm.vec3.new(0, 0, 39.24) / 4
+		acceleration = sm.vec3.new(0, 0, 10)
 	}
 }
 sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.acos, math.asin
