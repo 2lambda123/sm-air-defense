@@ -38,6 +38,7 @@
 	- clippath: The path to the executable file that can pipe the passed string and save it to the clipboard
 	- build: Scriptable Computer mod like this build for ("SC", "SCI")
 	- verbose: Enable detailed mode for this build (true, false)
+	- features: Enable or disable some features. The list of features should start with `{` and end with `}`. It should contain a comma-separated list of feature names, then `=`, and after it should contain the feature status `true` or `false`. Examples: `{use_velocity=false}`, `{use_acceleration=true}`, `{use_velocity=false,use_acceleration=false}`
 - Targets
 	- [default], clip: Preprocess, minify and copy to the clipboard (`clippath`)
 	- minify: Preprocess, minify and save it to the file (`minify_out`)
