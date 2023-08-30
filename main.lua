@@ -39,6 +39,12 @@ function table_to_vec3(x)
 	end
 	return ([[sm.vec3.new(%s)]]):format(x:sub(2, -2):gsub(' ', ''))
 end
+function pp_unpack(x, n)
+	n = tonumber(n)
+	for i=1,n do
+		outputLua(('%s[%s]%s'):format(x, i, (i < n and ',' or '')))
+	end
+end
 function prequire(m)
 	local ok, err = pcall(require, m) 
 	if not ok then return nil, err end
@@ -220,7 +226,7 @@ function EMA_set(self, value) return ([[%s.result = %s]]):format(self, value) en
 !(
 function TargetTracker_new()
 	return ([[{
-		tracked_positions = {}, last_time = -math.huge,
+		tracked_positions = {}, tracked_times = {}, last_time = -math.huge,
 		velocity_mean = %s, acceleration_mean = %s,
 		samples_count = 0
 	}]]):format(EMA_new(), EMA_new())
@@ -236,24 +242,24 @@ function TargetTracker_track(self, target, new_position)
 	self.tracked_positions[2] = self.tracked_positions[1]
 	self.tracked_positions[1] = new_position
 
+	self.tracked_times[3] = self.tracked_times[2]
+	self.tracked_times[2] = self.tracked_times[1]
+	self.tracked_times[1] = os.clock()
+
 	if #self.tracked_positions == 3 then
 		TargetTracker_update(self)
 	end
 end
 function TargetTracker_update(self)
-	local p = self.tracked_positions
-	!local time = CONFIG.tracker.shutter_speed
+	local p1, p2, p3 = @@pp_unpack(self.tracked_positions, 3)
+	local t1, t2, t3 = @@pp_unpack(self.tracked_times, 3)
 
-	local vel2, vel1 = (p[2] - p[3]) / !(time), (p[1] - p[2]) / !(time)
-	local accel = (vel2 - vel1) / !(time*2)
+	local v2, v1 = (p2 - p3) / (t2 - t3), (p1 - p2) / (t1 - t2)
+	local accel = (v2 - v1) / (t1 - t3)
 
-	if @@EMA_get(self.velocity_mean) ~= nil then
-		@@EMA_set(self.velocity_mean, @@EMA_get(self.velocity_mean) + @@EMA_get(self.acceleration_mean)*!(time))
-	end
-
-	!local coeffs = CONFIG.tracker.mean
-	@@EMA_update(self.velocity_mean, vel1, !(coeffs.velocity))
-	@@EMA_update(self.acceleration_mean, accel, !(coeffs.acceleration))
+	@@EMA_update(self.velocity_mean, v1, !(CONFIG.tracker.mean.velocity))
+	@@EMA_update(self.acceleration_mean, accel, !(CONFIG.tracker.mean.acceleration))
+	--local v_mean = (v2 + v1) / 2
 end
 !(
 function TargetTracker_velocity(self)
@@ -338,6 +344,7 @@ if target ~= nil then
 		!local required_samples_number = CONFIG.autolaunch.position_samples_number
 		if time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
 			@@setreg("LAUNCH", false)
+			target_finder_state = nil
 		elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
 			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
 			!if VERBOSE then
@@ -349,7 +356,9 @@ if target ~= nil then
 					print("LAUNCHING")
 				end
 			!end
-			@@setreg("LAUNCH", can_launch and @@getreg('ALLOW_LAUNCH'))
+			if can_launch and @@getreg('ALLOW_LAUNCH') then
+				@@setreg("LAUNCH", true)
+			end
 		!if VERBOSE then
 		elseif time_since >= 0 then
 			print("WAITING")
