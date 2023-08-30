@@ -24,6 +24,7 @@
 	- acceleration (**type:** `number`): The absolute acceleration of the projectile used in calculations
 - autolaunch
 	- enable (**type:** `boolean`): Enable the autolaunch of the projectile
+	- reload_time (**type:** `number`): Time in seconds of inactivity until the next launch
 	- position_samples_number (**type:** `number`): The number of samples of the target position used in the calculation before the launch is ready (see: `shutter_speed`)
 	- stabilization_time (**type:** `number`): The time in seconds before launch at which no actions will be performed
 	- min_launch_vangle (**type:** `number`): The minimum vertical launch angle
