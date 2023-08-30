@@ -8,7 +8,8 @@ minify_command := $(lua) "./lua-minify/minify.lua" minify $(pp_out)
 clippath ?= "clip.exe"
 PPDEFS := "ppdefs.lua"
 build ?= "SCI"
-verbose = true
+verbose ?= true
+features ?= {}
 
 .DEFAULT_GOAL = clip
 
@@ -18,7 +19,7 @@ minify: preprocess
 	$(minify_command) > $(minify_out)
 
 ppdefs:
-	echo return {BUILD=$(build), VERBOSE=$(verbose)}> $(PPDEFS)
+	echo return {BUILD=$(build), VERBOSE=$(verbose), FEATURES=$(features)}> $(PPDEFS)
 
 preprocess: ppdefs
 	$(lua) "./LuaPreprocess/preprocess-cl.lua" -o main.lua $(pp_out)

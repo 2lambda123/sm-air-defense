@@ -1,7 +1,18 @@
 
 !(
-BUILD = require("ppdefs").BUILD
-VERBOSE = require("ppdefs").VERBOSE
+PPDEFS = require("ppdefs")
+
+BUILD = PPDEFS.BUILD
+VERBOSE = PPDEFS.VERBOSE
+FEATURES = PPDEFS.FEATURES or {}
+
+function get_feature(name, default)
+	if FEATURES[name] == nil then return default end
+	return FEATURES[name]
+end
+
+USE_VELOCITY = get_feature('use_velocity', true)
+USE_ACCELERATION = get_feature('use_acceleration', true)
 
 function sqr_dot(vec)
 	return ([[%s:dot(%s)]]):format(vec, vec)
@@ -257,9 +268,12 @@ function TargetTracker_update(self)
 	local v2, v1 = (p2 - p3) / (t2 - t3), (p1 - p2) / (t1 - t2)
 	local accel = (v2 - v1) / (t1 - t3)
 
-	@@EMA_update(self.velocity_mean, v1, !(CONFIG.tracker.mean.velocity))
-	@@EMA_update(self.acceleration_mean, accel, !(CONFIG.tracker.mean.acceleration))
-	--local v_mean = (v2 + v1) / 2
+	!if USE_VELOCITY then
+		@@EMA_update(self.velocity_mean, v1, !(CONFIG.tracker.mean.velocity))
+	!end
+	!if USE_ACCELERATION then
+		@@EMA_update(self.acceleration_mean, accel, !(CONFIG.tracker.mean.acceleration))
+	!end
 end
 !(
 function TargetTracker_velocity(self)
