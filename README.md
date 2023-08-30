@@ -1,40 +1,59 @@
 
-# CONFIG
+## CONFIG
 
 - motor
-	- vangle (**type:** `number`): The motor vertical angle offset
-	- hangle (**type:** `number`): The motor horizontal angle offset
-	- velocity (**type:** `number`): The motor velocity
-	- strength (**type:** `number`): The motor strength
+	- vangle (**type:** `number`): Motor vertical angle offset
+	- hangle (**type:** `number`): Motor horizontal angle offset
+	- velocity (**type:** `number`): Motor velocity
+	- strength (**type:** `number`): Motor strength
+	- index (**type:** `{hmotor: number, vmotor: number}`): Vertical and horizontal motor indices
+	- min_angle (**type:** `number`): Minimum permissible angle for motors
+- target
+	- position (**type:** `{x: number, y: number, z: number}`): The target position offset relative to the radar
+	- velocity (**type:** `{x: number, y: number, z: number}`): The target velocity offset relative to the radar
+	- acceleration (**type:** `{x: number, y: number, z: number}`): The target acceleration offset relative to the radar
 - tracker
 	- expiration_time (**type:** `number`): The time in seconds before the current target is considered lost
 	- min_height (**type:** `number`): The minimum height of the target relative to the radar at which the target will be used
 	- min_distance (**type:** `number`): The minimum target distance relative to the radar at which the target will be used
 	- max_distance (**type:** `number`): The maximum target distance relative to the radar at which the target will be used
 	- shutter_speed (**type:** `number`): The period in seconds between snapshots of the target position
-	- mean_coeffs (**type:** `{velocity: [0,1], acceleration: [0,1]}`): The EMA velocity/acceleration coefficients
-- target
-	- position (**type:** `vec3`): The target position offset relative to the radar
-	- velocity (**type:** `vec3`): The target velocity offset relative to the radar
-	- acceleration (**type:** `vec3`): The target acceleration offset relative to the radar
+	- mean (**type:** `{velocity: [0,1], acceleration: [0,1]}`): The exponential moving average (EMA) velocity/acceleration coefficients
 - projectile
 	- speed (**type:** `number`): The projectile speed used in calculations
 	- acceleration (**type:** `number`): The absolute acceleration of the projectile used in calculations
 - autolaunch
 	- enable (**type:** `boolean`): Enable the autolaunch of the projectile
-	- aiming_time (**type:** `number`): The pointing time in seconds at which the shooting angle will be approximated
+	- position_samples_number (**type:** `number`): The number of samples of the target position used in the calculation before the launch is ready (see: `shutter_speed`)
 	- stabilization_time (**type:** `number`): The time in seconds before launch at which no actions will be performed
 	- min_launch_vangle (**type:** `number`): The minimum vertical launch angle
-	- min_aim_vangle (**type:** `number`): The minimum vertical aiming angle
-	- mean_coeffs (**type:** `{hangle: [0,1], vangle: [0,1]}`): The DEMA angles coefficients
 
-# Build
+## Build
+
+- Variables
+	- pp_out: Path to the preprocessed output file
+	- minify_out: The path to the minified output file. **Only when using the `minify` target**
+	- lua: The path to the `lua` executable
+	- clippath: The path to the executable file that can pipe the passed string and save it to the clipboard
+	- build: Scriptable Computer mod like this build for ("SC", "SCI")
+	- verbose: Enable detailed mode for this build (true, false)
+- Targets
+	- [default], clip: Preprocess, minify and copy to the clipboard (`clippath`)
+	- minify: Preprocess, minify and save it to the file (`minify_out`)
+	- preprocess: Only preprocess without minifying and save it to the file (`pp_out`)
 
 ```bash
 # download submodules 'lua-minify' and 'LuaPreprocess'
 $ git submodule update --init
-# preprocess and copy to clipboard
+
+# preprocess, minify and copy to the clipboard
 $ make
-# preprocess and save it to 'minified_main.lua'
+$ make clip
+
+# preprocess, minify and save it to the file (see: `minify_out`)
 $ make minify
 ```
+
+## Config Template
+
+The file [config.template.lua](config.template.lua) contains a template for the config for the cannon. You can copy it to the [config.lua](config.lua) file and adjust parameters for yourself. See [Config](#config)
