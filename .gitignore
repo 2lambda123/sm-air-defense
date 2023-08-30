@@ -7,3 +7,5 @@
 !lua-minify
 !LuaPreprocess
 !Makefile
+config.lua
+!config.template.lua
