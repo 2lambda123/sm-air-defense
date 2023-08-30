@@ -14,7 +14,7 @@ function setreg(reg, value)
 	return ([[%s(%s,%s)]]):format(BUILD == 'SCI' and 'sci.setreg' or 'setreg', reg, value)
 end
 function getreg(reg)
-	return ([[%s(%s)]]):format(BUILD == 'SCI' and 'sci.getreg' or 'getreg', reg)
+	return ([[(%s(%s) == 1)]]):format(BUILD == 'SCI' and 'sci.getreg' or 'getreg', reg)
 end
 function getRadars()
 	return BUILD == 'SCI' and 'sci.getRadars()' or 'getRadars()'
@@ -342,13 +342,14 @@ if target ~= nil then
 		local time_since = os.clock() - autolaunch_state.start_time
 		local position_samples = @@TargetTracker_samples_number(target_tracker)
 		!local required_samples_number = CONFIG.autolaunch.position_samples_number
-		if time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
-			@@setreg("LAUNCH", false)
+		if time_since >= !(CONFIG.autolaunch.stabilization_time + CONFIG.autolaunch.reload_time + 1) then
 			target_finder_state = nil
+		elseif time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
+			@@setreg("LAUNCH", false)
 		elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
 			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
 			!if VERBOSE then
-				if @@getreg('ALLOW_LAUNCH') == 0 then
+				if not @@getreg('ALLOW_LAUNCH') then
 					print("NOT ALLOWED TO LAUNCH")
 				elseif not can_launch then
 					print("CANNOT LAUNCH")

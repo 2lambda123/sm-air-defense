@@ -26,6 +26,7 @@ return {
 	},
 	autolaunch = {
 		enable = true,
+		reload_time = 1,
 		position_samples_number = 15,
 		stabilization_time = 0.15,
 		min_launch_vangle = math.rad(20),
