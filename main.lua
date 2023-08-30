@@ -48,7 +48,7 @@ function table_to_vec3(x)
 	if x == "{0,0,0}" then
 		return [[sm.vec3.zero()]]
 	end
-	return ([[sm.vec3.new(%s)]]):format(x:sub(2, -2):gsub(' ', ''))
+	return ([[sm.vec3.new(%s)]]):format(x:sub(2, -2))
 end
 function pp_unpack(x, n)
 	n = tonumber(n)
@@ -57,7 +57,7 @@ function pp_unpack(x, n)
 	end
 end
 function prequire(m)
-	local ok, err = pcall(require, m) 
+	local ok, err = pcall(require, m)
 	if not ok then return nil, err end
 	return err
 end
@@ -156,8 +156,9 @@ function get_motor(index, default_angle)
 end
 
 function polar_to_vec3(distance, hangle, vangle)
-	local x = distance * cos(vangle) * cos(hangle)
-	local y = distance * cos(vangle) * sin(hangle)
+	local cos_vangle = cos(vangle)
+	local x = distance * cos_vangle * cos(hangle)
+	local y = distance * cos_vangle * sin(hangle)
 	local z = distance * sin(vangle)
 	return sm.vec3.new(x, y, z)
 end
@@ -169,9 +170,11 @@ function vec3_to_polar(vector)
 	return distance, hangle, vangle
 end
 
+!(
 function vec3_of_target(target)
-	return polar_to_vec3(target[4], target[2], target[3])
+	return ([[polar_to_vec3(%s[4], %s[2], %s[3])]]):format(target, target, target)
 end
+)
 
 function dist_between_targets(target1, target2)
 	local r1, h1, v1, r2, h2, v2 = target1[4], target1[2], target1[3], target2[4], target2[2], target2[3]
@@ -338,7 +341,7 @@ local target = smart_find_target(target_finder_state, radar, function(v)
 end)
 
 if target ~= nil then
-	local recent_position = vec3_of_target(target)
+	local recent_position = @@vec3_of_target(target)
 
 	TargetTracker_track(target_tracker, target, recent_position)
 	local target_velocity, target_acceleration = @@TargetTracker_velocity(target_tracker), @@TargetTracker_acceleration(target_tracker)
