@@ -33,16 +33,25 @@ function vmotor_setAngle(motor, angle)
 		if %s >= %s then %s.setAngle(%s+%s) end
 	]]):format(angle, CONFIG.motor.min_vangle + CONFIG.motor.vangle, motor, angle, CONFIG.motor.vangle)
 end
+function table_to_vec3(x)
+	if x == "{0,0,0}" then
+		return [[sm.vec3.zero()]]
+	end
+	return ([[sm.vec3.new(%s)]]):format(x:sub(2, -2):gsub(' ', ''))
+end
 
 CONFIG = {
 	motor = {
 		vangle = 0,
 		hangle = math.pi/2,
-		--hangle = 0,
 		velocity = 1,
 		strength = 5000,
 		index = { hmotor = 1, vmotor = 2 },
 		min_vangle = math.rad(10),
+	}, target = {
+		position = {-5.25, -0.25, -0.25},
+		velocity = {0, 0, 0},
+		acceleration = {0, 0, 10}
 	}, tracker = {
 		expiration_time = 2,
 		min_height = 0.5,
@@ -61,12 +70,6 @@ CONFIG = {
 	},
 }
 )
-CONFIG = CONFIG or { target = {
-		position = -sm.vec3.new(5.25, 0.25, 0.25),
-		velocity = sm.vec3.zero(),
-		acceleration = sm.vec3.new(0, 0, 10)
-	}
-}
 sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.acos, math.asin
 
 function cbrt(x)
@@ -284,9 +287,9 @@ end
 )
 
 function calculate_aim(position, velocity, acceleration)
-	position = position + CONFIG.target.position
-	velocity = velocity + CONFIG.target.velocity
-	acceleration = acceleration + CONFIG.target.acceleration
+	position = position + @@table_to_vec3(!(CONFIG.target.position))
+	velocity = velocity + @@table_to_vec3(!(CONFIG.target.velocity))
+	acceleration = acceleration + @@table_to_vec3(!(CONFIG.target.acceleration))
 	local t = calculate_bullet_hit(
 		position, velocity, acceleration, !(CONFIG.projectile.speed), !(CONFIG.projectile.acceleration)
 	)[1]
