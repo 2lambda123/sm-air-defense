@@ -1,6 +1,6 @@
 [submodule "lua-minify"]
 	path = lua-minify
-	url = https://github.com/stravant/lua-minify.get
+	url = https://github.com/stravant/lua-minify.git
 [submodule "LuaPreprocess"]
 	path = LuaPreprocess
 	url = https://github.com/ReFreezed/LuaPreprocess.git
