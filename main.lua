@@ -79,17 +79,22 @@ function pp_append(dest, src, max_size)
 		outputLua(('%s[#%s+1]=%s[%s]\n'):format(dest, dest, src, i))
 	end
 end
-function prequire(m)
-	local ok, err = pcall(require, m)
-	if not ok then return nil, err end
-	return err
+function file_exists(name)
+	local f = io.open(name, 'r')
+	if f ~= nil then
+		io.close(f)
+		return true
+	else
+		return false
+	end
 end
 
-CONFIG = prequire("config")
-if not CONFIG then
+if not file_exists("config.lua") then
 	io.stderr:write("ERROR: the config file 'config.lua' was not found. You can create it using the template file 'config.template.lua'\n")
 	os.exit(1)
 end
+
+CONFIG = require("config")
 )
 sqrt, sin, cos, pi, acos, asin = math.sqrt, math.sin, math.cos, math.pi, math.acos, math.asin
 
@@ -411,7 +416,7 @@ if target ~= nil then
 			!end
 			if can_launch and @@getreg('ALLOW_LAUNCH') then
 				@@setreg("LAUNCH", true)
-			end
+end
 		elseif time_since >= 0 then
 		elseif position_samples == !(required_samples_number) then
 			!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
