@@ -35,6 +35,9 @@ VERBOSE_FINAL_ACCELERATION = get_verbose_feature('final_acceleration', false)
 function sqr_dot(vec)
 	return ([[%s:dot(%s)]]):format(vec, vec)
 end
+function dot(vec1, vec2)
+	return ([[%s:dot(%s)]]):format(vec1, vec2)
+end
 function sgn(x)
 	return ([[(%s < 0 and -1 or 1)]]):format(x)
 end
@@ -210,9 +213,9 @@ end
 
 function calculate_bullet_hit(position, velocity, acceleration, bullet_speed, bullet_acceleration)
 	local c0 = (@@sqr_dot(acceleration) - bullet_acceleration^2) / 4
-	local c1 = velocity:dot(acceleration) - bullet_speed*bullet_acceleration
-	local c2 = position:dot(acceleration) + @@sqr_dot(velocity) - bullet_speed^2
-	local c3 = 2*position:dot(velocity)
+	local c1 = @@dot(velocity, acceleration) - bullet_speed*bullet_acceleration
+	local c2 = @@dot(position, acceleration) + @@sqr_dot(velocity) - bullet_speed^2
+	local c3 = @@dot(position, velocity)*2
 	local c4 = @@sqr_dot(position)
 	return solve_quartic(c0, c1, c2, c3, c4)
 end
