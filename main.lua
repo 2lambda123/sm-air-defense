@@ -6,13 +6,31 @@ BUILD = PPDEFS.BUILD
 VERBOSE = PPDEFS.VERBOSE
 FEATURES = PPDEFS.FEATURES or {}
 
+assert(type(VERBOSE) == 'boolean' or type(VERBOSE) == 'table', "'VERBOSE' must have a 'table' type or a 'boolean' type")
+assert(type(FEATURES) == 'nil' or type(FEATURES) == 'table', "'FEATURES' must have a 'table' type or a 'nil' type")
+
 function get_feature(name, default)
 	if FEATURES[name] == nil then return default end
 	return FEATURES[name]
 end
+function get_verbose_feature(name, default)
+	if type(VERBOSE) ~= 'table' then
+		if VERBOSE == false then return false end
+		return default
+	end
+	if VERBOSE[name] == nil then return default end
+	return VERBOSE[name]
+end
 
-USE_VELOCITY = get_feature('use_velocity', true)
+USE_VELOCITY     = get_feature('use_velocity', true)
 USE_ACCELERATION = get_feature('use_acceleration', true)
+
+VERBOSE_VELOCITY           = get_verbose_feature('velocity', false)
+VERBOSE_ACCELERATION       = get_verbose_feature('acceleration', false)
+VERBOSE_AUTOLAUNCH         = get_verbose_feature('autolaunch', true)
+VERBOSE_CALCULATE_AIM      = get_verbose_feature('calculate_aim', false)
+VERBOSE_FINAL_VELOCITY     = get_verbose_feature('final_velocity', false)
+VERBOSE_FINAL_ACCELERATION = get_verbose_feature('final_acceleration', false)
 
 function sqr_dot(vec)
 	return ([[%s:dot(%s)]]):format(vec, vec)
@@ -54,6 +72,11 @@ function pp_unpack(x, n)
 	n = tonumber(n)
 	for i=1,n do
 		outputLua(('%s[%s]%s'):format(x, i, (i < n and ',' or '')))
+	end
+end
+function pp_append(dest, src, max_size)
+	for i=1,max_size do
+		outputLua(('%s[#%s+1]=%s[%s]\n'):format(dest, dest, src, i))
 	end
 end
 function prequire(m)
@@ -118,8 +141,7 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	local v = q/(2*u)
 	local solutions = solve_quadratic(1, -u, v + s)
 	local solutions2 = solve_quadratic(1, u, -v + s)
-	solutions[#solutions+1] = solutions2[1]
-	solutions[#solutions+1] = solutions2[2]
+	@@pp_append(solutions, solutions2, 2)
 	for i=1,#solutions do
 		solutions[i] = solutions[i] - a/4
 	end
@@ -181,25 +203,13 @@ function dist_between_targets(target1, target2)
 	return sqrt(r1^2 + r2^2 - 2*r1*r2*(cos(v1)*cos(v2)*cos(h1 - h2) + sin(v1)*sin(v2)))
 end
 
-function sort_positives(arr)
-	table.sort(arr, function(a, b) return a > b end)
-	for i = #arr,1,-1 do
-		if arr[i] >= 0 then break end
-		arr[i] = nil
-	end
-	table.sort(arr)
-	return arr
-end
-
 function calculate_bullet_hit(position, velocity, acceleration, bullet_speed, bullet_acceleration)
 	local c0 = (@@sqr_dot(acceleration) - bullet_acceleration^2) / 4
 	local c1 = velocity:dot(acceleration) - bullet_speed*bullet_acceleration
 	local c2 = position:dot(acceleration) + @@sqr_dot(velocity) - bullet_speed^2
 	local c3 = 2*position:dot(velocity)
 	local c4 = @@sqr_dot(position)
-	local solutions = solve_quartic(c0, c1, c2, c3, c4)
-
-	return sort_positives(solutions)
+	return solve_quartic(c0, c1, c2, c3, c4)
 end
 
 function SMA_new(size, default)
@@ -273,9 +283,15 @@ function TargetTracker_update(self)
 
 	!if USE_VELOCITY then
 		@@EMA_update(self.velocity_mean, v1, !(CONFIG.tracker.mean.velocity))
+		!if VERBOSE_VELOCITY then
+			print('@'..self.samples_count, 'velocity:', @@EMA_get(self.velocity_mean))
+		!end
 	!end
 	!if USE_ACCELERATION then
 		@@EMA_update(self.acceleration_mean, accel, !(CONFIG.tracker.mean.acceleration))
+		!if VERBOSE_ACCELERATION then
+			print('@'..self.samples_count, 'acceleration:', @@EMA_get(self.acceleration_mean))
+		!end
 	!end
 end
 !(
@@ -289,15 +305,31 @@ function TargetTracker_samples_number(self)
 	return ([[%s.samples_count]]):format(self)
 end
 )
+function find_smallest_positive(list)
+	local min = math.huge
+	for _, val in pairs(list) do
+		if val >= 0 and val < min then
+			min = val
+		end
+	end
+	return min
+end
 
 function calculate_aim(position, velocity, acceleration)
 	position = position + @@table_to_vec3(!(CONFIG.target.position))
 	velocity = velocity + @@table_to_vec3(!(CONFIG.target.velocity))
 	acceleration = acceleration + @@table_to_vec3(!(CONFIG.target.acceleration))
-	local t = calculate_bullet_hit(
+	local solutions = calculate_bullet_hit(
 		position, velocity, acceleration, !(CONFIG.projectile.speed), !(CONFIG.projectile.acceleration)
-	)[1]
-	if t == nil then return nil end
+	)
+	local t = find_smallest_positive(solutions)
+	!if VERBOSE_CALCULATE_AIM then
+		for i, v in ipairs(solutions) do
+			print(i..':', v)
+		end
+		print("get:", t)
+	!end
+	if t == math.huge then return nil end
 
 	local next_position = position + velocity*t + acceleration*t^2/2
 	local distance, hangle, vangle = vec3_to_polar(next_position)
@@ -365,29 +397,35 @@ if target ~= nil then
 			@@setreg("LAUNCH", false)
 		elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
 			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
-			!if VERBOSE then
-				if not @@getreg('ALLOW_LAUNCH') then
-					print("NOT ALLOWED TO LAUNCH")
-				elseif not can_launch then
-					print("CANNOT LAUNCH")
-				else
-					print("LAUNCHING")
+			!if VERBOSE_AUTOLAUNCH then
+				if not verbose_autolaunch_print_state then
+					if not @@getreg('ALLOW_LAUNCH') then
+						print("NOT ALLOWED TO LAUNCH")
+					elseif not can_launch then
+						print("CANNOT LAUNCH")
+					else
+						print("LAUNCHING")
+					end
 				end
+				verbose_autolaunch_print_state = true
 			!end
 			if can_launch and @@getreg('ALLOW_LAUNCH') then
 				@@setreg("LAUNCH", true)
 			end
-		!if VERBOSE then
 		elseif time_since >= 0 then
-			print("WAITING")
-		!end
 		elseif position_samples == !(required_samples_number) then
+			!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
+				print('final velocity:', target_velocity)
+			!end
+			!if VERBOSE_FINAL_ACCELERATION and USE_ACCELERATION then
+				print('final acceleration:', target_acceleration)
+			!end
 			autolaunch_state.start_time = os.clock()
 		else
 			@@setreg("LAUNCH", false)
 			@@hmotor_setAngle(hmotor, hangle)
 			@@vmotor_setAngle(vmotor, vangle)
-			!if VERBOSE then
+			!if VERBOSE_AUTOLAUNCH then
 				print(('[%d/%d] (%d%%)'):format(position_samples, !(required_samples_number), 100 * position_samples / !(required_samples_number)))
 			!end
 		end

@@ -32,17 +32,25 @@
 ## Build
 
 - Variables
-	- pp_out: Path to the preprocessed output file
-	- minify_out: The path to the minified output file. **Only when using the `minify` target**
-	- lua: The path to the `lua` executable
-	- clippath: The path to the executable file that can pipe the passed string and save it to the clipboard
-	- build: Scriptable Computer mod like this build for ("SC", "SCI")
-	- verbose: Enable detailed mode for this build (true, false)
-	- features: Enable or disable some features. The list of features should start with `{` and end with `}`. It should contain a comma-separated list of feature names, then `=`, and after it should contain the feature status `true` or `false`. Examples: `{use_velocity=false}`, `{use_acceleration=true}`, `{use_velocity=false,use_acceleration=false}`
+	- **pp_out**: Path to the preprocessed output file
+	- **minify_out**: The path to the minified output file. *Only when using the `minify` target*
+	- **lua**: The path to the `lua` executable
+	- **clippath**: The path to the executable file that can pipe the passed string and save it to the clipboard
+	- **build**: Scriptable Computer mod like this build for ("SC", "SCI")
+	- **verbose**: Enable detailed mode for this build. It can also accept a table type and enable/disable individual detailed output. (**type:** `boolean` or `{*: nil or boolean}`). Examples: `true`, `false`, `{autolaunch=false}`, `{velocity=true,autolaunch=false}`, `{acceleration=true,velocity=true}`
+		- **velocity**: Print velocity every time it is updated
+		- **acceleration**: Print acceleration every time it is updated
+		- **autolaunch**: The current status of the charge and the result of the launch
+		- **calculate_aim**: Print all possible roots of the solved equation (even negative ones) and print the selected
+		- **final_velocity**: Output the final velocity
+		- **final_acceleration**: Output the final acceleration
+	- **features**: Enable or disable some features. The list of features should start with `{` and end with `}`. It should contain a comma-separated list of feature names, then `=`, and after it should contain the feature status `true` or `false`. Examples: `{use_velocity=false}`, `{use_acceleration=true}`, `{use_velocity=false,use_acceleration=false}`
+		- **use_velocity**: Use velocity in calculations
+		- **use_acceleration**: Use acceleration in calculations
 - Targets
-	- [default], clip: Preprocess, minify and copy to the clipboard (`clippath`)
-	- minify: Preprocess, minify and save it to the file (`minify_out`)
-	- preprocess: Only preprocess without minifying and save it to the file (`pp_out`)
+	- **[default]**, **clip**: Preprocess, minify and copy to the clipboard (`clippath`)
+	- **minify**: Preprocess, minify and save it to the file (`minify_out`)
+	- **preprocess**: Only preprocess without minifying and save it to the file (`pp_out`)
 
 ```bash
 # download submodules 'lua-minify' and 'LuaPreprocess'
