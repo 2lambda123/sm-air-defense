@@ -206,10 +206,12 @@ function vec3_of_target(target)
 end
 )
 
+!(
 function dist_between_targets(target1, target2)
 	local r1, h1, v1, r2, h2, v2 = target1[4], target1[2], target1[3], target2[4], target2[2], target2[3]
 	return sqrt(r1^2 + r2^2 - 2*r1*r2*(cos(v1)*cos(v2)*cos(h1 - h2) + sin(v1)*sin(v2)))
 end
+)
 
 function calculate_bullet_hit(position, velocity, acceleration, bullet_speed, bullet_acceleration)
 	local c0 = (@@sqr_dot(acceleration) - bullet_acceleration^2) / 4
@@ -419,7 +421,7 @@ if target ~= nil then
 			!end
 			if can_launch and @@getreg('ALLOW_LAUNCH') then
 				@@setreg("LAUNCH", true)
-end
+			end
 		elseif time_since >= 0 then
 		elseif position_samples == !(required_samples_number) then
 			!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
