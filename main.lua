@@ -33,6 +33,7 @@ end
 
 USE_VELOCITY     = get_feature('use_velocity', true)
 USE_ACCELERATION = get_feature('use_acceleration', true)
+MANUAL_CONTROL   = get_feature('manual', false)
 
 VERBOSE_VELOCITY           = get_verbose_feature('velocity', false)
 VERBOSE_ACCELERATION       = get_verbose_feature('acceleration', false)
@@ -399,46 +400,51 @@ if target ~= nil then
 	@@EMA_update(angles_mean.hangle, hangle, 0.8)
 	@@EMA_update(angles_mean.vangle, vangle, 0.8)
 
-	autolaunch_state = autolaunch_state or { start_time = math.huge }
+	!if not MANUAL_CONTROL
+		autolaunch_state = autolaunch_state or { start_time = math.huge }
 
-	local time_since = os.clock() - autolaunch_state.start_time
-	local position_samples = @@TargetTracker_samples_number(target_tracker)
-	!local required_samples_number = CONFIG.autolaunch.position_samples_number
-	if time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
-		@@setreg("LAUNCH", false)
-		target_finder_state = nil
-	elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
-		local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
-		!if VERBOSE_AUTOLAUNCH then
-			if not verbose_autolaunch_print_state then
-				if not @@getreg('ALLOW_LAUNCH') then
-					print("NOT ALLOWED TO LAUNCH")
-				elseif not can_launch then
-					print("CANNOT LAUNCH")
-				else
-					print("LAUNCHING")
+		local time_since = os.clock() - autolaunch_state.start_time
+		local position_samples = @@TargetTracker_samples_number(target_tracker)
+		!local required_samples_number = CONFIG.autolaunch.position_samples_number
+		if time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
+			@@setreg("LAUNCH", false)
+			target_finder_state = nil
+		elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
+			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
+			!if VERBOSE_AUTOLAUNCH then
+				if not verbose_autolaunch_print_state then
+					if not @@getreg('ALLOW_LAUNCH') then
+						print("NOT ALLOWED TO LAUNCH")
+					elseif not can_launch then
+						print("CANNOT LAUNCH")
+					else
+						print("LAUNCHING")
+					end
 				end
+				verbose_autolaunch_print_state = true
+			!end
+			if can_launch and @@getreg('ALLOW_LAUNCH') then
+				@@setreg("LAUNCH", true)
 			end
-			verbose_autolaunch_print_state = true
-		!end
-		if can_launch and @@getreg('ALLOW_LAUNCH') then
-			@@setreg("LAUNCH", true)
+		elseif time_since >= 0 then
+		elseif position_samples == !(required_samples_number) then
+			!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
+				print('final velocity:', target_velocity)
+			!end
+			!if VERBOSE_FINAL_ACCELERATION and USE_ACCELERATION then
+				print('final acceleration:', target_acceleration)
+			!end
+			autolaunch_state.start_time = os.clock()
+		else
+			@@setreg("LAUNCH", false)
+			@@hmotor_setAngle(hmotor, @@EMA_get(angles_mean.hangle))
+			@@vmotor_setAngle(vmotor, @@EMA_get(angles_mean.vangle))
+			!if VERBOSE_AUTOLAUNCH then
+				print(('[%d/%d] (%d%%)'):format(position_samples, !(required_samples_number), 100 * position_samples / !(required_samples_number)))
+			!end
 		end
-	elseif time_since >= 0 then
-	elseif position_samples == !(required_samples_number) then
-		!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
-			print('final velocity:', target_velocity)
-		!end
-		!if VERBOSE_FINAL_ACCELERATION and USE_ACCELERATION then
-			print('final acceleration:', target_acceleration)
-		!end
-		autolaunch_state.start_time = os.clock()
-	else
-		@@setreg("LAUNCH", false)
+	!else
 		@@hmotor_setAngle(hmotor, @@EMA_get(angles_mean.hangle))
 		@@vmotor_setAngle(vmotor, @@EMA_get(angles_mean.vangle))
-		!if VERBOSE_AUTOLAUNCH then
-			print(('[%d/%d] (%d%%)'):format(position_samples, !(required_samples_number), 100 * position_samples / !(required_samples_number)))
-		!end
-	end
+	!end
 end
