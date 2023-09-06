@@ -23,8 +23,8 @@
 	- speed (**type:** `number`): The projectile speed used in calculations
 	- acceleration (**type:** `number`): The absolute acceleration of the projectile used in calculations
 - autolaunch
-	- enable (**type:** `boolean`): Enable the autolaunch of the projectile
-	- reload_time (**type:** `number`): Time in seconds of inactivity until the next launch
+	<!--- - enable (**type:** `boolean`): Enable the autolaunch of the projectile --->
+	<!--- - reload_time (**type:** `number`): Time in seconds of inactivity until the next launch --->
 	- position_samples_number (**type:** `number`): The number of samples of the target position used in the calculation before the launch is ready (see: `shutter_speed`)
 	- stabilization_time (**type:** `number`): The time in seconds before launch at which no actions will be performed
 	- min_launch_vangle (**type:** `number`): The minimum vertical launch angle
@@ -47,6 +47,7 @@
 	- **features**: Enable or disable some features. The list of features should start with `{` and end with `}`. It should contain a comma-separated list of feature names, then `=`, and after it should contain the feature status `true` or `false`. Examples: `{use_velocity=false}`, `{use_acceleration=true}`, `{use_velocity=false,use_acceleration=false}`
 		- **use_velocity** (`true`): Use velocity in calculations
 		- **use_acceleration** (`true`): Use acceleration in calculations
+		- **manual** (`false`): Enable manual control
 - Targets
 	- **[default]**, **clip**: Preprocess, minify and copy to the clipboard (`clippath`)
 	- **minify**: Preprocess, minify and save it to the file (`minify_out`)
