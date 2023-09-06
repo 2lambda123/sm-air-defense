@@ -9,9 +9,18 @@ FEATURES = PPDEFS.FEATURES or {}
 assert(type(VERBOSE) == 'boolean' or type(VERBOSE) == 'table', "'VERBOSE' must have a 'table' type or a 'boolean' type")
 assert(type(FEATURES) == 'nil' or type(FEATURES) == 'table', "'FEATURES' must have a 'table' type or a 'nil' type")
 
+function to_bool(x)
+	if type(x) == 'number' then
+		if x == 0 then return false end
+		if x == 1 then return true end
+		assert(x == 0 or x == 1, "expected 1 or 0")
+	end
+	return x
+end
+
 function get_feature(name, default)
 	if FEATURES[name] == nil then return default end
-	return FEATURES[name]
+	return to_bool(FEATURES[name])
 end
 function get_verbose_feature(name, default)
 	if type(VERBOSE) ~= 'table' then
@@ -19,7 +28,7 @@ function get_verbose_feature(name, default)
 		return default
 	end
 	if VERBOSE[name] == nil then return default end
-	return VERBOSE[name]
+	return to_bool(VERBOSE[name])
 end
 
 USE_VELOCITY     = get_feature('use_velocity', true)
@@ -32,12 +41,6 @@ VERBOSE_CALCULATE_AIM      = get_verbose_feature('calculate_aim', false)
 VERBOSE_FINAL_VELOCITY     = get_verbose_feature('final_velocity', false)
 VERBOSE_FINAL_ACCELERATION = get_verbose_feature('final_acceleration', false)
 
-function sqr_dot(vec)
-	return ([[%s:dot(%s)]]):format(vec, vec)
-end
-function dot(vec1, vec2)
-	return ([[%s:dot(%s)]]):format(vec1, vec2)
-end
 function sgn(x)
 	return ([[(%s < 0 and -1 or 1)]]):format(x)
 end
@@ -214,11 +217,11 @@ end
 )
 
 function calculate_bullet_hit(position, velocity, acceleration, bullet_speed, bullet_acceleration)
-	local c0 = (@@sqr_dot(acceleration) - bullet_acceleration^2) / 4
-	local c1 = @@dot(velocity, acceleration) - bullet_speed*bullet_acceleration
-	local c2 = @@dot(position, acceleration) + @@sqr_dot(velocity) - bullet_speed^2
-	local c3 = @@dot(position, velocity)*2
-	local c4 = @@sqr_dot(position)
+	local c0 = (acceleration:dot(acceleration) - bullet_acceleration^2) / 4
+	local c1 = velocity:dot(acceleration) - bullet_speed*bullet_acceleration
+	local c2 = position:dot(acceleration) + velocity:dot(velocity) - bullet_speed^2
+	local c3 = 2*position:dot(velocity)
+	local c4 = position:dot(position)
 	return solve_quartic(c0, c1, c2, c3, c4)
 end
 
@@ -288,27 +291,29 @@ function TargetTracker_update(self)
 	local p1, p2, p3 = @@pp_unpack(self.tracked_positions, 3)
 	local t1, t2, t3 = @@pp_unpack(self.tracked_times, 3)
 
-	local v2, v1 = (p2 - p3) / (t2 - t3), (p1 - p2) / (t1 - t2)
-	local accel = (v2 - v1) / (t1 - t3)
+	-- t1 > t2 > t3
+	local v1 = (p1 - p2) / (t1 - t2)
+	local v2 = (p2 - p3) / (t2 - t3)
 
-	!if USE_VELOCITY then
-		@@EMA_update(self.velocity_mean, v1, !(CONFIG.tracker.mean.velocity))
-		!if VERBOSE_VELOCITY then
-			print('@'..self.samples_count, 'velocity:', @@EMA_get(self.velocity_mean))
-		!end
+	local a = (v1 - v2) / (t1 - t3)
+
+	@@EMA_update(self.velocity_mean, v1, !(CONFIG.tracker.mean.velocity))
+	@@EMA_update(self.acceleration_mean, a, !(CONFIG.tracker.mean.acceleration))
+
+	!if VERBOSE_VELOCITY then
+		print('@'..self.samples_count, 'velocity:', @@EMA_get(self.velocity_mean))
 	!end
-	!if USE_ACCELERATION then
-		@@EMA_update(self.acceleration_mean, accel, !(CONFIG.tracker.mean.acceleration))
-		!if VERBOSE_ACCELERATION then
-			print('@'..self.samples_count, 'acceleration:', @@EMA_get(self.acceleration_mean))
-		!end
+	!if VERBOSE_ACCELERATION then
+		print('@'..self.samples_count, 'acceleration:', @@EMA_get(self.acceleration_mean))
 	!end
 end
 !(
 function TargetTracker_velocity(self)
+	if not USE_VELOCITY then return [[sm.vec3.zero()]] end
 	return ([[(%s or sm.vec3.zero())]]):format(EMA_get(self..'.velocity_mean'), self)
 end
 function TargetTracker_acceleration(self)
+	if not USE_ACCELERATION then return [[sm.vec3.zero()]] end
 	return ([[(%s or sm.vec3.zero())]]):format(EMA_get(self..'.acceleration_mean'), self)
 end
 function TargetTracker_samples_number(self)
@@ -390,54 +395,50 @@ if target ~= nil then
 	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration)
 	if distance == nil then return end
 
-	!if not CONFIG.autolaunch.enable then
-		angles_sma = angles_sma or { hangle = SMA_new(40), vangle = SMA_new(40) }
-		local sma_hangle, sma_vangle = SMA_update(angles_sma.hangle, hangle), SMA_update(angles_sma.vangle, vangle)
-		@@hmotor_setAngle(hmotor, sma_hangle)
-		@@vmotor_setAngle(vmotor, sma_vangle)
-	!else
-		autolaunch_state = autolaunch_state or { start_time = math.huge }
+	angles_mean = angles_mean or { hangle = @@EMA_new(), vangle = @@EMA_new() }
+	@@EMA_update(angles_mean.hangle, hangle, 0.8)
+	@@EMA_update(angles_mean.vangle, vangle, 0.8)
 
-		local time_since = os.clock() - autolaunch_state.start_time
-		local position_samples = @@TargetTracker_samples_number(target_tracker)
-		!local required_samples_number = CONFIG.autolaunch.position_samples_number
-		if time_since >= !(CONFIG.autolaunch.stabilization_time + CONFIG.autolaunch.reload_time + 1) then
-			target_finder_state = nil
-		elseif time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
-			@@setreg("LAUNCH", false)
-		elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
-			local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
-			!if VERBOSE_AUTOLAUNCH then
-				if not verbose_autolaunch_print_state then
-					if not @@getreg('ALLOW_LAUNCH') then
-						print("NOT ALLOWED TO LAUNCH")
-					elseif not can_launch then
-						print("CANNOT LAUNCH")
-					else
-						print("LAUNCHING")
-					end
+	autolaunch_state = autolaunch_state or { start_time = math.huge }
+
+	local time_since = os.clock() - autolaunch_state.start_time
+	local position_samples = @@TargetTracker_samples_number(target_tracker)
+	!local required_samples_number = CONFIG.autolaunch.position_samples_number
+	if time_since >= !(CONFIG.autolaunch.stabilization_time + 1) then
+		@@setreg("LAUNCH", false)
+		target_finder_state = nil
+	elseif time_since >= !(CONFIG.autolaunch.stabilization_time) then
+		local can_launch = !(CONFIG.autolaunch.min_launch_vangle - CONFIG.motor.vangle) <= vangle
+		!if VERBOSE_AUTOLAUNCH then
+			if not verbose_autolaunch_print_state then
+				if not @@getreg('ALLOW_LAUNCH') then
+					print("NOT ALLOWED TO LAUNCH")
+				elseif not can_launch then
+					print("CANNOT LAUNCH")
+				else
+					print("LAUNCHING")
 				end
-				verbose_autolaunch_print_state = true
-			!end
-			if can_launch and @@getreg('ALLOW_LAUNCH') then
-				@@setreg("LAUNCH", true)
 			end
-		elseif time_since >= 0 then
-		elseif position_samples == !(required_samples_number) then
-			!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
-				print('final velocity:', target_velocity)
-			!end
-			!if VERBOSE_FINAL_ACCELERATION and USE_ACCELERATION then
-				print('final acceleration:', target_acceleration)
-			!end
-			autolaunch_state.start_time = os.clock()
-		else
-			@@setreg("LAUNCH", false)
-			@@hmotor_setAngle(hmotor, hangle)
-			@@vmotor_setAngle(vmotor, vangle)
-			!if VERBOSE_AUTOLAUNCH then
-				print(('[%d/%d] (%d%%)'):format(position_samples, !(required_samples_number), 100 * position_samples / !(required_samples_number)))
-			!end
+			verbose_autolaunch_print_state = true
+		!end
+		if can_launch and @@getreg('ALLOW_LAUNCH') then
+			@@setreg("LAUNCH", true)
 		end
-	!end
+	elseif time_since >= 0 then
+	elseif position_samples == !(required_samples_number) then
+		!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
+			print('final velocity:', target_velocity)
+		!end
+		!if VERBOSE_FINAL_ACCELERATION and USE_ACCELERATION then
+			print('final acceleration:', target_acceleration)
+		!end
+		autolaunch_state.start_time = os.clock()
+	else
+		@@setreg("LAUNCH", false)
+		@@hmotor_setAngle(hmotor, @@EMA_get(angles_mean.hangle))
+		@@vmotor_setAngle(vmotor, @@EMA_get(angles_mean.vangle))
+		!if VERBOSE_AUTOLAUNCH then
+			print(('[%d/%d] (%d%%)'):format(position_samples, !(required_samples_number), 100 * position_samples / !(required_samples_number)))
+		!end
+	end
 end

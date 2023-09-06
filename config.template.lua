@@ -14,21 +14,19 @@ return {
 	},
 	tracker = {
 		expiration_time = 2,
-		min_height = 0.5,
+		min_height = 1,
 		min_distance = 8,
 		max_distance = 250,
 		shutter_speed = 0.2,
-		mean = { velocity = 2 / (4 + 1), acceleration = 2 / (15 + 1) },
+		mean = { velocity = 2 / (10 + 1), acceleration = 2 / (15 + 1) },
 	},
 	projectile = {
-		speed = 80,
-		acceleration = 0,
+		speed = 99.8,
+		acceleration = -19,
 	},
 	autolaunch = {
-		enable = true,
-		reload_time = 1,
-		position_samples_number = 15,
-		stabilization_time = 0.15,
+		position_samples_number = 20,
+		stabilization_time = 0.2,
 		min_launch_vangle = math.rad(20),
 	},
 }
