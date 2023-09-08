@@ -400,7 +400,7 @@ if target ~= nil then
 	@@EMA_update(angles_mean.hangle, hangle, 0.8)
 	@@EMA_update(angles_mean.vangle, vangle, 0.8)
 
-	!if not MANUAL_CONTROL
+	!if not MANUAL_CONTROL then
 		autolaunch_state = autolaunch_state or { start_time = math.huge }
 
 		local time_since = os.clock() - autolaunch_state.start_time
