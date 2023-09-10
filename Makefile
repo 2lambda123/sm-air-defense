@@ -22,4 +22,4 @@ ppdefs:
 	echo return {BUILD=$(build), VERBOSE=$(verbose), FEATURES=$(features)}> $(PPDEFS)
 
 preprocess: ppdefs
-	$(lua) "./LuaPreprocess/preprocess-cl.lua" -o main.lua $(pp_out)
+	$(lua) "./LuaPreprocess/preprocess-cl.lua" --meta -o main.lua $(pp_out)

@@ -6,7 +6,9 @@
 	- hangle (**type:** `number`): Motor horizontal angle offset
 	- velocity (**type:** `number`): Motor velocity
 	- strength (**type:** `number`): Motor strength
-	- index (**type:** `{hmotor: number, vmotor: number}`): Vertical and horizontal motor indices
+	- index
+		- hmotor (**type:** `number`) Vertical motor index
+		- vmotor (**type:** `number`) Horizontal motor index
 	- min_angle (**type:** `number`): Minimum permissible angle for motors
 - target
 	- position (**type:** `{x: number, y: number, z: number}`): The target position offset relative to the radar
@@ -18,7 +20,11 @@
 	- min_distance (**type:** `number`): The minimum target distance relative to the radar at which the target will be used
 	- max_distance (**type:** `number`): The maximum target distance relative to the radar at which the target will be used
 	- shutter_speed (**type:** `number`): The period in seconds between snapshots of the target position
-	- mean (**type:** `{velocity: [0,1], acceleration: [0,1]}`): The exponential moving average (EMA) velocity/acceleration coefficients
+	- mean
+		- velocity (**type:** `number [0,1]`) The exponential moving average (EMA) velocity coefficient
+		- acceleration (**type:** `number [0,1]`): The exponential moving average (EMA) acceleration coefficient
+		- vangle (**type:** `number [0,1]`) The exponential moving average (EMA) vertical motor angle coefficient
+		- hangle (**type:** `number [0,1]`) The exponential moving average (EMA) horizontal motor angle coefficient
 - projectile
 	- speed (**type:** `number`): The projectile speed used in calculations
 	- acceleration (**type:** `number`): The absolute acceleration of the projectile used in calculations

@@ -38,7 +38,7 @@ MANUAL_CONTROL   = get_feature('manual', false)
 VERBOSE_VELOCITY           = get_verbose_feature('velocity', false)
 VERBOSE_ACCELERATION       = get_verbose_feature('acceleration', false)
 VERBOSE_AUTOLAUNCH         = get_verbose_feature('autolaunch', true)
-VERBOSE_CALCULATE_AIM      = get_verbose_feature('calculate_aim', false)
+VERBOSE_CALCULATE_AIM      = get_verbose_feature('calculate_aim', true)
 VERBOSE_FINAL_VELOCITY     = get_verbose_feature('final_velocity', false)
 VERBOSE_FINAL_ACCELERATION = get_verbose_feature('final_acceleration', false)
 
@@ -109,6 +109,7 @@ function cbrt(x)
 	if x < 0 then return -((-x)^(1/3))
 	else return (x)^(1/3) end
 end
+
 function solve_quadratic(a, b, c)
 	local D = b^2 - 4*a*c
 	if D > 0 then
@@ -119,6 +120,7 @@ function solve_quadratic(a, b, c)
 	end
 	return {}
 end
+
 function solve_cubic(a, b, c, d)
 	if a == 0 then return solve_quadratic(b, c, d) end
 	local p = (3*a*c - b^2) / (3*a^2)
@@ -140,6 +142,7 @@ function solve_cubic(a, b, c, d)
 	end
 	return solutions
 end
+
 function solve_quartic(c0, c1, c2, c3, c4)
 	if c0 == 0 then return solve_cubic(c1, c2, c3, c4) end
 	local a, b, c, d = c1/c0, c2/c0, c3/c0, c4/c0
@@ -159,6 +162,54 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	end
 	return solutions
 end
+
+!(
+function create_newton_polynomial_table(points)
+--[[
+	https://en.wikipedia.org/wiki/Divided_differences
+	xn = points[n + 1][1]
+	yn = points[n + 1][2]
+	   j 1                2                3                4             ...
+	 i |---------------------------------------------------------------------
+	 1 | [y0]             [y1]             [y2]             [y3]          ...
+	 2 | [y0,y1]          [y1,y2]          [y2,y3]          [y3,y4]       ...
+	 3 | [y0,y1,y2]       [y1,y2,y3]       [y2,y3,y4]       [y3,y4,y5]    ...
+	 4 | [y0,y1,y2,y3]    [y1,y2,y3,y4]    [y2,y3,y4,y5]    [y3,y4,y5,y6] ...
+	...| ...              ...              ...              ...           ...
+	k-2| [y0,y1,...,yk-3] [y1,y2,...,yk-2] [y2,y3,...,yk-1]
+	k-1| [y0,y1,...,yk-2] [y1,y2,...,yk-1]
+	 k | [y0,y1,...,yk-1]
+--]]
+	
+	diff_matrix = {}
+	for i=1,#points do
+		diff_matrix[i] = { [1] = points[i][2] }
+	end
+   
+	for i=2,#points do
+		for j=1,#points - i + 1 do
+			diff_matrix[j][i] = (diff_matrix[j + 1][i - 1] - diff_matrix[j][i - 1]) / (points[i + j - 1][1] - points[j][1])
+		end
+	end
+
+	local result = {}
+	for i=1,#points do
+		result[i] = { [1] = points[i][1], [2] = diff_matrix[1][i] }
+	end
+	return result
+end
+)
+
+function interpolate_newton_polynomial(x, table)
+	result = table[1][2]
+	local last = 1
+	for i=2,#table do
+		last = last * (x - table[i - 1][1])
+		result = result + last * table[i][2]
+	end
+	return result
+end
+
 function find_target(radar, filter_fn)
 	-- targets structure { [1] = id, [2] = hangle, [3] = vangle, [4] = distance, [5] = force }
 	!for _, angle in pairs({0, math.pi}) do
@@ -331,21 +382,18 @@ function find_smallest_positive(list)
 	return min
 end
 
-function calculate_aim(position, velocity, acceleration)
+function calculate_aim(position, velocity, acceleration, proj_speed, proj_acceleration)
 	position = position + @@table_to_vec3(!(CONFIG.target.position))
 	velocity = velocity + @@table_to_vec3(!(CONFIG.target.velocity))
 	acceleration = acceleration + @@table_to_vec3(!(CONFIG.target.acceleration))
-	local solutions = calculate_bullet_hit(
-		position, velocity, acceleration, !(CONFIG.projectile.speed), !(CONFIG.projectile.acceleration)
-	)
+	local solutions = calculate_bullet_hit(position, velocity, acceleration, proj_speed, proj_acceleration)
 	local t = find_smallest_positive(solutions)
-	!if VERBOSE_CALCULATE_AIM then
-		for i, v in ipairs(solutions) do
-			print(i..':', v)
-		end
-		print("get:", t)
-	!end
 	if t == math.huge then return nil end
+	!if VERBOSE_CALCULATE_AIM then
+		if t > 25 then
+			print(("HIGH PROJECTILE FLIGHT TIME: %.2f"):format(t))
+		end
+	!end
 
 	local next_position = position + velocity*t + acceleration*t^2/2
 	local distance, hangle, vangle = vec3_to_polar(next_position)
@@ -373,15 +421,16 @@ function smart_find_target(state, radar, fn)
 	return target
 end
 
+
 local radar = get_radar()
 hmotor = hmotor or get_motor(!(CONFIG.motor.index.hmotor), 0)
 vmotor = vmotor or get_motor(!(CONFIG.motor.index.vmotor), !(CONFIG.motor.min_vangle))
 
 target_finder_state = target_finder_state or @@SmartFindTargetState_new(function()
 	target_tracker = @@TargetTracker_new()
-	!if CONFIG.autolaunch.enable then
-		autolaunch_state = nil
-	!end
+	--!if not MANUAL_CONTROL then
+	--	autolaunch_state = nil
+	--!end
 end)
 
 local target = smart_find_target(target_finder_state, radar, function(v)
@@ -393,12 +442,15 @@ if target ~= nil then
 
 	TargetTracker_track(target_tracker, target, recent_position)
 	local target_velocity, target_acceleration = @@TargetTracker_velocity(target_tracker), @@TargetTracker_acceleration(target_tracker)
-	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration)
+
+	local proj_speed = interpolate_newton_polynomial(target[4], !(create_newton_polynomial_table(CONFIG.projectile.speed_interpolation_points)))
+
+	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration, proj_speed, 0)
 	if distance == nil then return end
 
 	angles_mean = angles_mean or { hangle = @@EMA_new(), vangle = @@EMA_new() }
-	@@EMA_update(angles_mean.hangle, hangle, 0.8)
-	@@EMA_update(angles_mean.vangle, vangle, 0.8)
+	@@EMA_update(angles_mean.hangle, hangle, !(CONFIG.tracker.mean.hangle))
+	@@EMA_update(angles_mean.vangle, vangle, !(CONFIG.tracker.mean.vangle))
 
 	!if not MANUAL_CONTROL then
 		autolaunch_state = autolaunch_state or { start_time = math.huge }
@@ -419,6 +471,8 @@ if target ~= nil then
 						print("CANNOT LAUNCH")
 					else
 						print("LAUNCHING")
+						print("dist:", target[4])
+						print("proj_speed:", proj_speed)
 					end
 				end
 				verbose_autolaunch_print_state = true
