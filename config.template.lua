@@ -21,8 +21,7 @@ return {
 		mean = { velocity = 2 / (10 + 1), acceleration = 2 / (15 + 1) },
 	},
 	projectile = {
-		speed = 99.8,
-		acceleration = -19,
+		speed = 75,
 	},
 	autolaunch = {
 		position_samples_number = 20,

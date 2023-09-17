@@ -9,31 +9,45 @@ FEATURES = PPDEFS.FEATURES or {}
 assert(type(VERBOSE) == 'boolean' or type(VERBOSE) == 'table', "'VERBOSE' must have a 'table' type or a 'boolean' type")
 assert(type(FEATURES) == 'nil' or type(FEATURES) == 'table', "'FEATURES' must have a 'table' type or a 'nil' type")
 
-function to_bool(x)
-	if type(x) == 'number' then
-		if x == 0 then return false end
-		if x == 1 then return true end
-		assert(x == 0 or x == 1, "expected 1 or 0")
+function to_boolean(value)
+	if type(value) == 'boolean' then return value end
+	if type(value) == 'number' then
+		if value == 0 then return false end
+		if value == 1 then return true end
+		error(("expected '1' or '0' but get '%d'"):format(value))
 	end
-	return x
+	error(("expected 'boolean' or 'number' type but get '%s'"):format(type(value)))
 end
 
 function get_feature(name, default)
 	if FEATURES[name] == nil then return default end
-	return to_bool(FEATURES[name])
+
+	local feature = FEATURES[name]
+	if type(default) == 'string' then
+		assert(type(feature) == 'string', ("expected 'string' type but get '%s' in feature '%s'"):format(type(feature), name))
+		return feature:lower()
+	end
+	if type(default) == 'boolean' then
+		assert(type(feature) == 'boolean' or type(feature) == 'number',
+			("expected 'boolean' or 'number' type but get '%s' in feature '%s'"):format(type(feature), name))
+		return to_boolean(feature)
+	end
+	assert(type(feature) == type(default), ("expected '%s' type but get '%s' in feature '%s'"):format(type(default), type(feature), name))
+	return FEATURES[name]
 end
 function get_verbose_feature(name, default)
-	if type(VERBOSE) ~= 'table' then
-		if VERBOSE == false then return false end
+	if type(VERBOSE) == 'boolean' or type(VERBOSE) == 'number' then
+		if to_boolean(VERBOSE) == false then return false end
 		return default
 	end
 	if VERBOSE[name] == nil then return default end
-	return to_bool(VERBOSE[name])
+	return to_boolean(VERBOSE[name])
 end
 
-USE_VELOCITY     = get_feature('use_velocity', true)
-USE_ACCELERATION = get_feature('use_acceleration', true)
-MANUAL_CONTROL   = get_feature('manual', false)
+USE_VELOCITY         = get_feature('use_velocity', true)
+USE_ACCELERATION     = get_feature('use_acceleration', true)
+MANUAL_CONTROL       = get_feature('manual', false)
+INTERPOLATION_METHOD = get_feature('interpolation', 'linear')
 
 VERBOSE_VELOCITY           = get_verbose_feature('velocity', false)
 VERBOSE_ACCELERATION       = get_verbose_feature('acceleration', false)
@@ -163,53 +177,6 @@ function solve_quartic(c0, c1, c2, c3, c4)
 	return solutions
 end
 
-!(
-function create_newton_polynomial_table(points)
---[[
-	https://en.wikipedia.org/wiki/Divided_differences
-	xn = points[n + 1][1]
-	yn = points[n + 1][2]
-	   j 1                2                3                4             ...
-	 i |---------------------------------------------------------------------
-	 1 | [y0]             [y1]             [y2]             [y3]          ...
-	 2 | [y0,y1]          [y1,y2]          [y2,y3]          [y3,y4]       ...
-	 3 | [y0,y1,y2]       [y1,y2,y3]       [y2,y3,y4]       [y3,y4,y5]    ...
-	 4 | [y0,y1,y2,y3]    [y1,y2,y3,y4]    [y2,y3,y4,y5]    [y3,y4,y5,y6] ...
-	...| ...              ...              ...              ...           ...
-	k-2| [y0,y1,...,yk-3] [y1,y2,...,yk-2] [y2,y3,...,yk-1]
-	k-1| [y0,y1,...,yk-2] [y1,y2,...,yk-1]
-	 k | [y0,y1,...,yk-1]
---]]
-	
-	diff_matrix = {}
-	for i=1,#points do
-		diff_matrix[i] = { [1] = points[i][2] }
-	end
-   
-	for i=2,#points do
-		for j=1,#points - i + 1 do
-			diff_matrix[j][i] = (diff_matrix[j + 1][i - 1] - diff_matrix[j][i - 1]) / (points[i + j - 1][1] - points[j][1])
-		end
-	end
-
-	local result = {}
-	for i=1,#points do
-		result[i] = { [1] = points[i][1], [2] = diff_matrix[1][i] }
-	end
-	return result
-end
-)
-
-function interpolate_newton_polynomial(x, table)
-	result = table[1][2]
-	local last = 1
-	for i=2,#table do
-		last = last * (x - table[i - 1][1])
-		result = result + last * table[i][2]
-	end
-	return result
-end
-
 function find_target(radar, filter_fn)
 	-- targets structure { [1] = id, [2] = hangle, [3] = vangle, [4] = distance, [5] = force }
 	!for _, angle in pairs({0, math.pi}) do
@@ -261,20 +228,46 @@ function vec3_of_target(target)
 end
 )
 
-!(
-function dist_between_targets(target1, target2)
-	local r1, h1, v1, r2, h2, v2 = target1[4], target1[2], target1[3], target2[4], target2[2], target2[3]
-	return sqrt(r1^2 + r2^2 - 2*r1*r2*(cos(v1)*cos(v2)*cos(h1 - h2) + sin(v1)*sin(v2)))
-end
-)
-
-function calculate_bullet_hit(position, velocity, acceleration, bullet_speed, bullet_acceleration)
+function calculate_projectile_hit2(position, velocity, acceleration, bullet_speed, bullet_acceleration)
 	local c0 = (acceleration:dot(acceleration) - bullet_acceleration^2) / 4
 	local c1 = velocity:dot(acceleration) - bullet_speed*bullet_acceleration
 	local c2 = position:dot(acceleration) + velocity:dot(velocity) - bullet_speed^2
 	local c3 = 2*position:dot(velocity)
 	local c4 = position:dot(position)
 	return solve_quartic(c0, c1, c2, c3, c4)
+end
+
+function newton_method(x0, f, iterations)
+	for i=1,iterations do
+		local y, yprime = f(x0)
+		if math.abs(yprime) < 1e-10 then return nil end
+
+		local x1 = x0 - (y / yprime)
+		if math.abs(x1 - x0) <= 1e-10 then
+			return x1
+		end
+		x0 = x1
+	end
+	return nil
+end
+
+function calculate_projectile_hit(last, position, velocity, acceleration, friction, bullet_speed)
+	local p, v, a, k, s = position, velocity, acceleration, friction, bullet_speed
+	-- y = ((a + kv)(e^(kt) - 1) - akt) / k^2
+	-- y^2 + 2py + p^2 - s^2 t^2 = 0
+	local part1_y2 = (a + v*k)/k
+	local f = function(t)
+		local expkt = math.exp(k*t)
+		local y1 = ((a + v*k)*(expkt - 1) - a*k*t) / k^2
+		local y2 = part1_y2*expkt - a/k
+
+		local x = y1:dot(y1) + p:dot(y1)*2 + p:dot(p) - s^2*t^2
+		local xprime = y1:dot(y2)*2 + p:dot(y2)*2 - 2*t*s^2
+		return x, xprime
+	end
+	local result = newton_method(last, f, 100)
+	if result == nil or result <= 0 then return nil end
+	return result
 end
 
 function SMA_new(size, default)
@@ -372,23 +365,23 @@ function TargetTracker_samples_number(self)
 	return ([[%s.samples_count]]):format(self)
 end
 )
-function find_smallest_positive(list)
-	local min = math.huge
-	for _, val in pairs(list) do
-		if val >= 0 and val < min then
-			min = val
-		end
-	end
-	return min
-end
 
-function calculate_aim(position, velocity, acceleration, proj_speed, proj_acceleration)
+!(
+function CalculateAim_new()
+	return ([[{ last_t = 1 }]])
+end
+)
+function calculate_aim(state, position, velocity, acceleration, proj_speed)
 	position = position + @@table_to_vec3(!(CONFIG.target.position))
 	velocity = velocity + @@table_to_vec3(!(CONFIG.target.velocity))
 	acceleration = acceleration + @@table_to_vec3(!(CONFIG.target.acceleration))
-	local solutions = calculate_bullet_hit(position, velocity, acceleration, proj_speed, proj_acceleration)
-	local t = find_smallest_positive(solutions)
-	if t == math.huge then return nil end
+	local t = calculate_projectile_hit(state.last_t, position, velocity, acceleration, 0.1, proj_speed)
+	local t2 = calculate_projectile_hit2(position, velocity, acceleration, proj_speed, 0)
+	if t == nil then return nil end
+	print("t:", t)
+	print("t2:", t2[2])
+	state.last_t = t
+
 	!if VERBOSE_CALCULATE_AIM then
 		if t > 25 then
 			print(("HIGH PROJECTILE FLIGHT TIME: %.2f"):format(t))
@@ -443,9 +436,12 @@ if target ~= nil then
 	TargetTracker_track(target_tracker, target, recent_position)
 	local target_velocity, target_acceleration = @@TargetTracker_velocity(target_tracker), @@TargetTracker_acceleration(target_tracker)
 
-	local proj_speed = interpolate_newton_polynomial(target[4], !(create_newton_polynomial_table(CONFIG.projectile.speed_interpolation_points)))
+	local target_distance = (recent_position + @@table_to_vec3(!(CONFIG.target.position))):length()
 
-	local distance, hangle, vangle = calculate_aim(recent_position, target_velocity, target_acceleration, proj_speed, 0)
+	calculate_aim_state = calculate_aim_state or @@CalculateAim_new()
+	local distance, hangle, vangle = calculate_aim(
+		calculate_aim_state, recent_position, target_velocity, target_acceleration, !(CONFIG.projectile.speed)
+	)
 	if distance == nil then return end
 
 	angles_mean = angles_mean or { hangle = @@EMA_new(), vangle = @@EMA_new() }
@@ -471,8 +467,6 @@ if target ~= nil then
 						print("CANNOT LAUNCH")
 					else
 						print("LAUNCHING")
-						print("dist:", target[4])
-						print("proj_speed:", proj_speed)
 					end
 				end
 				verbose_autolaunch_print_state = true
@@ -481,7 +475,7 @@ if target ~= nil then
 				@@setreg("LAUNCH", true)
 			end
 		elseif time_since >= 0 then
-		elseif position_samples == !(required_samples_number) then
+		elseif position_samples >= !(required_samples_number) then
 			!if VERBOSE_FINAL_VELOCITY and USE_VELOCITY then
 				print('final velocity:', target_velocity)
 			!end
